@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles */
+@layer components {
+  /* تحسين تأثير الانتقال للألوان */
+  .transition-colors {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+
+  /* تعريف حاوية عامة قابلة للتكيف */
+  /* .container {
+    @apply mx-auto w-full px-4;
+  }
+
+  @screen sm {
+    .container {
+      @apply px-5;
+    }
+  }
+
+  @screen md {
+    .container {
+      @apply px-6;
+    }
+  }
+
+  @screen lg {
+    .container {
+      @apply px-8 max-w-7xl;
+    }
+  }
+
+  @screen xl {
+    .container {
+      @apply px-10 max-w-7xl;
+    }
+  }
+
+  @screen 2xl {
+    .container {
+      @apply px-12 max-w-7xl;
+    }
+  } */
+}
