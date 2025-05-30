@@ -1,34 +1,28 @@
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import LoadingSpinner from '../ui/LoadingSpinner';
 
-const ProtectedRoute = ({ allowedRoles = [] }) => {
+const ProtectedRoute = ({ roles = [], redirectPath = '/login' }) => {
   const { user, isAuthenticated, loading } = useAuth();
+  const location = useLocation();
 
-  // أثناء تحميل بيانات المستخدم
   if (loading) {
-    return (
-      <div className="text-center py-10">
-        <p>Loading...</p>
-      </div>
-    );
+    return <LoadingSpinner fullScreen />;
   }
 
-  // إذا لم يكن المستخدم مسجّل دخول
-  if (!isAuthenticated || !user) {
-    return <Navigate to="/auth/login" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to={redirectPath} state={{ from: location }} replace />;
   }
 
-  // التحقق من الصلاحية بناءً على الدور
-  const userRole = user.role?.toLowerCase();
-  const isAllowed = allowedRoles.length === 0 || allowedRoles.some(role => role.toLowerCase() === userRole);
+  const userRole = user?.role?.toLowerCase();
+  const hasRequiredRole = roles.length === 0 || roles.some(role => role.toLowerCase() === userRole);
 
-  if (!isAllowed) {
-    return <Navigate to="/404" replace />;
+  if (!hasRequiredRole) {
+    return <Navigate to="/not-authorized" state={{ from: location }} replace />;
   }
 
-  // السماح بالوصول
   return <Outlet />;
 };
 
-export default ProtectedRoute;
+export default React.memo(ProtectedRoute);

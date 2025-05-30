@@ -1,98 +1,115 @@
-import React, { useEffect, useState } from "react";
-import PropTypes from "prop-types";
-import { getStudentDashboard } from "../../services/dashboardService";
-import DashboardCard from "./DashboardCard"; // Assuming we'll create this component
-import LoadingSpinner from "../common/LoadingSpinner";
-import ErrorAlert from "../common/ErrorAlert";
+import React from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useQuery } from 'react-query';
+import axios from '../../config/axios';
+import { Grid, Typography } from '@mui/material';
+import { Book, School, Payment } from '@mui/icons-material';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import DashboardCard from '../../components/dashboard/DashboardCard';
+import DashboardError from '../../components/dashboard/DashboardError';
+import DashboardSkeleton from '../../components/dashboard/DashboardSkeleton';
+import Layout from '../../components/layout/Layout';
 
 const StudentDashboard = () => {
-  const [dashboardData, setDashboardData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await getStudentDashboard();
-        setDashboardData(response.data);
-      } catch (err) {
-        console.error("Failed to load dashboard data:", err);
-        setError("Failed to load dashboard data. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const { data, isLoading, error, refetch } = useQuery('studentDashboard', async () => {
+    const response = await axios.get('/api/dashboard/student');
+    return response.data;
+  }, {
+    staleTime: 5 * 60 * 1000, // 5 دقائق cache
+    retry: 2,
+  });
 
-    fetchDashboardData();
-  }, []);
+  if (isLoading) return <DashboardSkeleton />;
+  if (error) return <DashboardError refetch={refetch} />;
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[300px]">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-6">
-        <ErrorAlert message={error} onRetry={() => window.location.reload()} />
-      </div>
-    );
-  }
-
-  if (!dashboardData) {
-    return (
-      <div className="container mx-auto px-4 py-6">
-        <ErrorAlert message="No dashboard data available" />
-      </div>
-    );
-  }
-
-  const cardData = [
-    { title: "My Courses", value: dashboardData.totalCourses, icon: "📚" },
-    { title: "Total Lessons", value: dashboardData.totalLessons, icon: "📖" },
-    { 
-      title: "Completed Lessons", 
-      value: dashboardData.completedLessons, 
-      icon: "✅" 
-    },
-    { 
-      title: "Progress", 
-      value: `${dashboardData.progressPercentage}%`, 
-      icon: "📈",
-      isPercentage: true 
-    },
+  // بيانات التقدم الدراسي
+  const progressData = [
+    { name: 'الأسبوع 1', progress: 20 },
+    { name: 'الأسبوع 2', progress: 45 },
+    { name: 'الأسبوع 3', progress: 60 },
+    { name: 'الأسبوع 4', progress: 75 },
   ];
 
   return (
-    <main className="container mx-auto px-4 py-8">
-      <header className="mb-10">
-        <h1 className="text-3xl font-bold text-gray-800">Student Dashboard</h1>
-        <p className="text-gray-600 mt-2">
-          Overview of your learning progress
-        </p>
-      </header>
+    <Layout>
+      <Typography variant="h4" gutterBottom sx={{ mb: 4, textAlign: 'center' }}>
+        لوحة تحكم الطالب
+      </Typography>
 
-      <section aria-labelledby="dashboard-stats">
-        <h2 id="dashboard-stats" className="sr-only">
-          Dashboard Statistics
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {cardData.map((card, index) => (
-            <DashboardCard key={index} {...card} />
-          ))}
-        </div>
-      </section>
-    </main>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={4}>
+          <DashboardCard 
+            title="الكورسات المسجلة" 
+            value={data.enrolledCourses} 
+            icon={<Book />}
+          />
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <DashboardCard 
+            title="إجمالي المدفوعات" 
+            value={`$${data.totalPaid.toFixed(2)}`}
+            icon={<Payment />}
+            color="success"
+          />
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <DashboardCard 
+            title="معدل الإكمال" 
+            value={`${data.completionRate || 0}%`} 
+            icon={<School />}
+            color="info"
+          />
+        </Grid>
+
+        <Grid item xs={12} md={8}>
+          <DashboardCard title="تقدمك الدراسي">
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={progressData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Line 
+                  type="monotone" 
+                  dataKey="progress" 
+                  stroke="#8884d8" 
+                  strokeWidth={2}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </DashboardCard>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <DashboardCard title="ملخص الكورسات">
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <DashboardCard 
+                  title="الكورسات النشطة" 
+                  value={`${data.activeCourses || 0}`} 
+                  variant="outlined"
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <DashboardCard 
+                  title="الكورسات المكتملة" 
+                  value={`${data.completedCourses || 0}`} 
+                  variant="outlined"
+                  size="small"
+                  color="success"
+                />
+              </Grid>
+            </Grid>
+          </DashboardCard>
+        </Grid>
+      </Grid>
+    </Layout>
   );
 };
 
-// Optional: Add prop types if you expect specific data structure
-StudentDashboard.propTypes = {
-  // Add any props if this component receives any
-};
-
-export default StudentDashboard;
+export default React.memo(StudentDashboard);

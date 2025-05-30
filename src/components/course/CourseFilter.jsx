@@ -1,103 +1,142 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Form, Row, Col, Button } from 'react-bootstrap';
+import { useCategories } from '../../hooks/useCategories';
 
-const CourseFilter = ({ categories, onFilter, isLoading = false }) => {
-  const [filters, setFilters] = useState({
-    searchTerm: '',
-    categoryId: ''
-  });
+const CourseFilter = ({ filters, onChange, isInstructorView = false }) => {
+  const { categories, loading } = useCategories();
+  const [localFilters, setLocalFilters] = useState(filters);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
+    const newFilters = { ...localFilters, [name]: value || null };
+    setLocalFilters(newFilters);
+    onChange(newFilters);
+  };
+
+  const handlePriceChange = (e) => {
+    const { name, value } = e.target;
+    const newFilters = { 
+      ...localFilters, 
+      [name]: value ? parseInt(value) : null 
+    };
+    setLocalFilters(newFilters);
+    onChange(newFilters);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onFilter(filters);
+    onChange(localFilters);
   };
 
   const handleReset = () => {
     const resetFilters = {
-      searchTerm: '',
-      categoryId: ''
+      category: null,
+      minPrice: null,
+      maxPrice: null,
+      search: '',
+      sort: 'newest',
+      page: 1
     };
-    setFilters(resetFilters);
-    onFilter(resetFilters);
+    setLocalFilters(resetFilters);
+    onChange(resetFilters);
   };
 
   return (
-    <Form onSubmit={handleSubmit} className="mb-4 p-3 bg-light rounded" role="search">
-      <Row className="g-3 align-items-end">
-        <Col md={6}>
-          <Form.Group controlId="searchTerm">
-            <Form.Label>Search Courses</Form.Label>
-            <Form.Control
-              type="search"
-              name="searchTerm"
-              value={filters.searchTerm}
-              onChange={handleChange}
-              placeholder="Search by course name or description..."
-              aria-label="Search courses"
-            />
-          </Form.Group>
-        </Col>
-        
-        <Col md={4}>
-          <Form.Group controlId="categoryId">
-            <Form.Label>Filter by Category</Form.Label>
-            <Form.Select
-              name="categoryId"
-              value={filters.categoryId}
-              onChange={handleChange}
-              aria-label="Select category to filter"
-            >
-              <option value="">All Categories</option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-        </Col>
-        
-        <Col md={2}>
-          <div className="d-flex gap-2">
-            <Button 
-              variant="primary" 
-              type="submit" 
-              disabled={isLoading}
-              aria-busy={isLoading}
-            >
-              {isLoading ? 'Applying Filters...' : 'Apply Filters'}
-            </Button>
-            
-            <Button
-              variant="outline-secondary"
-              onClick={handleReset}
-              disabled={isLoading}
-              type="button"
-            >
-              Reset
-            </Button>
-          </div>
-        </Col>
-      </Row>
-    </Form>
+    <div className="course-filter">
+      <form onSubmit={handleSubmit}>
+        <div className="filter-group">
+          <input
+            type="text"
+            name="search"
+            placeholder="ابحث عن دورات..."
+            value={localFilters.search || ''}
+            onChange={handleChange}
+            className="filter-input"
+          />
+        </div>
+
+        <div className="filter-group">
+          <select
+            name="category"
+            value={localFilters.category || ''}
+            onChange={handleChange}
+            className="filter-select"
+            disabled={loading}
+          >
+            <option value="">جميع التصنيفات</option>
+            {categories.map(category => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="filter-group price-range">
+          <input
+            type="number"
+            name="minPrice"
+            placeholder="الحد الأدنى"
+            value={localFilters.minPrice || ''}
+            onChange={handlePriceChange}
+            className="price-input"
+            min="0"
+          />
+          <span>إلى</span>
+          <input
+            type="number"
+            name="maxPrice"
+            placeholder="الحد الأقصى"
+            value={localFilters.maxPrice || ''}
+            onChange={handlePriceChange}
+            className="price-input"
+            min="0"
+          />
+        </div>
+
+        <div className="filter-group">
+          <select
+            name="sort"
+            value={localFilters.sort}
+            onChange={handleChange}
+            className="filter-select"
+          >
+            <option value="newest">الأحدث</option>
+            <option value="price">السعر من الأقل للأعلى</option>
+            <option value="price_desc">السعر من الأعلى للأقل</option>
+            <option value="rating">الأعلى تقييماً</option>
+            {isInstructorView && <option value="popular">الأكثر شعبية</option>}
+          </select>
+        </div>
+
+        <div className="filter-actions">
+          <button type="submit" className="btn btn-primary">
+            تطبيق الفلتر
+          </button>
+          <button 
+            type="button" 
+            onClick={handleReset} 
+            className="btn btn-outline"
+          >
+            إعادة الضبط
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };
 
 CourseFilter.propTypes = {
-  categories: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-      name: PropTypes.string.isRequired
-    })
-  ).isRequired,
-  onFilter: PropTypes.func.isRequired,
-  isLoading: PropTypes.bool
+  filters: PropTypes.shape({
+    category: PropTypes.number,
+    minPrice: PropTypes.number,
+    maxPrice: PropTypes.number,
+    search: PropTypes.string,
+    sort: PropTypes.string,
+    page: PropTypes.number
+  }).isRequired,
+  onChange: PropTypes.func.isRequired,
+  isInstructorView: PropTypes.bool
 };
 
 export default CourseFilter;

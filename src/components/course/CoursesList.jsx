@@ -1,71 +1,82 @@
-import React, { useEffect, useState } from 'react';
-import CourseCard from '../../components/CourseCard';
-import CourseFilter from '../../components/CourseFilter';
-import courseService from '../../services/courseService';
-import { Spinner } from 'react-bootstrap';
+import React from 'react';
+import { useCourses } from '../../hooks/useCourses';
+import CourseCard from './CourseCard';
+import CourseFilter from './CourseFilter';
+import LoadingSpinner from '../ui/LoadingSpinner';
+import Pagination from '../ui/Pagination';
+import EmptyState from '../ui/EmptyState';
 
-const CoursesList = () => {
-  const [courses, setCourses] = useState([]);
-  const [filteredCourses, setFilteredCourses] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+const CoursesList = ({ isInstructorView = false }) => {
+  const [filters, setFilters] = React.useState({
+    category: null,
+    minPrice: null,
+    maxPrice: null,
+    search: '',
+    sort: 'newest',
+    page: 1,
+    limit: 12
+  });
+  
+  const { courses, loading, error, totalPages, totalCount } = useCourses(
+    filters, 
+    isInstructorView
+  );
 
-  useEffect(() => {
-    fetchCoursesAndCategories();
-  }, []);
-
-  const fetchCoursesAndCategories = async () => {
-    setLoading(true);
-    try {
-      const [coursesRes, categoriesRes] = await Promise.all([
-        courseService.getAllCourses(),
-        courseService.getAllCategories()
-      ]);
-      setCourses(coursesRes);
-      setFilteredCourses(coursesRes);
-      setCategories(categoriesRes);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleFilterChange = (newFilters) => {
+    setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
   };
 
-  const handleFilter = (filters) => {
-    const { searchTerm, categoryId } = filters;
-    const filtered = courses.filter(course => {
-      const matchesSearch = course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            course.description.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = !categoryId || course.categoryId?.toString() === categoryId;
-      return matchesSearch && matchesCategory;
-    });
-    setFilteredCourses(filtered);
+  const handlePageChange = (page) => {
+    setFilters(prev => ({ ...prev, page }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <div className="message message-error">{error}</div>;
 
   return (
-    <div className="container my-4">
-      <h2 className="mb-3">Browse Courses</h2>
-      <CourseFilter 
-        categories={categories} 
-        onFilter={handleFilter}
-        isLoading={loading}
-      />
+    <div className="courses-section">
+      <div className="section-header">
+        <h2>
+          {isInstructorView ? 'دوراتي التعليمية' : 'تصفح جميع الدورات'}
+          {totalCount !== undefined && (
+            <span className="results-count"> ({totalCount} نتيجة)</span>
+          )}
+        </h2>
+        <CourseFilter 
+          filters={filters} 
+          onChange={handleFilterChange}
+          isInstructorView={isInstructorView}
+        />
+      </div>
 
-      {loading ? (
-        <div className="text-center mt-5">
-          <Spinner animation="border" role="status" />
-          <p>Loading courses...</p>
-        </div>
-      ) : filteredCourses.length === 0 ? (
-        <p className="text-muted text-center">No courses found.</p>
+      {courses.length === 0 ? (
+        <EmptyState
+          title="لا توجد دورات متاحة"
+          description="حاول تعديل فلتر البحث أو إنشاء دورة جديدة إذا كنت مدرباً"
+          actionText={isInstructorView ? "إنشاء دورة جديدة" : "استكشاف جميع الدورات"}
+          actionLink={isInstructorView ? "/instructor/courses/new" : "/courses"}
+        />
       ) : (
-        <div className="row g-4">
-          {filteredCourses.map(course => (
-            <div key={course.id} className="col-md-4">
-              <CourseCard course={course} />
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="courses-grid">
+            {courses.map(course => (
+              <CourseCard 
+                key={course.id} 
+                course={course} 
+                isInstructor={isInstructorView}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination 
+              currentPage={filters.page}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          )}
+        </>
       )}
     </div>
   );

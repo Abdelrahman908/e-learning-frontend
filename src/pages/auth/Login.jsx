@@ -67,7 +67,7 @@ const Login = () => {
     return !Object.values(errors).some(error => error);
   };
 
- const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
   e.preventDefault();
   
   if (!validateForm()) return;
@@ -75,7 +75,6 @@ const Login = () => {
   setIsSubmitting(true);
   
   try {
-    // استخدم الدالة المستوردة بشكل صحيح
     const response = await loginUser({
       email: formData.email,
       password: formData.password,
@@ -85,14 +84,9 @@ const Login = () => {
     console.log('Login Response:', response);
 
     if (response?.Success) {
-      localStorage.setItem("token", response.Data.Token);
-      localStorage.setItem("refreshToken", response.Data.RefreshToken);
-      
-      // إعداد الهيدر الافتراضي لـ axios
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.Data.Token}`;
-      
+      // تم نقل حفظ التوكن إلى AuthContext لضمان التزامن
       // التوجيه إلى الصفحة المطلوبة
-      const redirectTo = location.state?.from?.pathname || '/';
+      const redirectTo = location.state?.from?.pathname || '/dashboard';
       navigate(redirectTo, { replace: true });
       
       toast.success(response.Message || 'تم تسجيل الدخول بنجاح');
@@ -100,36 +94,35 @@ const Login = () => {
       throw new Error(response.Message || 'Login failed');
     }
   } catch (error) {
-    console.error("Login Error Details:", error);
-    toast.error(error.message || 'حدث خطأ أثناء تسجيل الدخول');
+    console.error("Login Error:", error);
+    
+    let errorMessage = error.message;
+    if (error.response) {
+      if (error.response.status === 401) {
+        errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+      } else if (error.response.status === 403) {
+        errorMessage = 'الحساب غير مفعل، يرجى تأكيد البريد الإلكتروني';
+      } else if (error.response.status === 400) {
+        errorMessage = 'بيانات الدخول غير صالحة';
+      }
+    } else if (error.message.includes('network')) {
+      errorMessage = 'لا يمكن الاتصال بالخادم، يرجى التحقق من اتصالك بالإنترنت';
+    }
+
+    toast.error(errorMessage, {
+      icon: <AlertCircle className="text-red-500" />
+    });
   } finally {
     setIsSubmitting(false);
   }
 };
-  useEffect(() => {
-    if (error) {
-      let errorMessage = error;
-      
-      if (error.includes('401')) {
-        errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-      } else if (error.includes('403')) {
-        errorMessage = 'الحساب غير مفعل، يرجى تأكيد البريد الإلكتروني';
-      } else if (error.includes('network')) {
-        errorMessage = 'لا يمكن الاتصال بالخادم، يرجى التحقق من اتصالك بالإنترنت';
-      }
 
-      toast.error(errorMessage, {
-        icon: <AlertCircle className="text-red-500" />
-      });
-    }
-  }, [error]);
-
-  useEffect(() => {
-    if (rememberedEmail) {
-      setFormData(prev => ({ ...prev, email: rememberedEmail }));
-      setRememberMe(true);
-    }
-  }, [rememberedEmail]);
+useEffect(() => {
+  if (rememberedEmail) {
+    setFormData(prev => ({ ...prev, email: rememberedEmail }));
+    setRememberMe(true);
+  }
+}, [rememberedEmail]);
 
   return (
     <AuthPageLayout 

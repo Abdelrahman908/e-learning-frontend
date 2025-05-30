@@ -1,18 +1,18 @@
-import React, { useContext, Suspense } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "./contexts/AuthContext"; 
+import React, { Suspense } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
-import ToastContainer from "./components/ui/ToastContainer";
 import LoadingSpinner from "./components/ui/LoadingSpinner";
 import Layout from "./components/layout/Layout";
 import ErrorBoundary from './utils/ErrorBoundary';
-// App.jsx
-// Lazy loading
+
+// Lazy loading for better performance
 const Navbar = React.lazy(() => import("./components/layout/Navbar"));
 const Footer = React.lazy(() => import("./components/layout/Footer"));
 const Hero = React.lazy(() => import("./components/layout/Hero"));
 const Sidebar = React.lazy(() => import("./components/layout/Sidebar"));
-
+const ToastContainer = React.lazy(() => import("./components/ui/ToastContainer"));
+const NotAuthorized = React.lazy(() => import("./pages/NotAuthorized"));
 
 // Public pages
 const Home = React.lazy(() => import("./pages/Home"));
@@ -29,16 +29,15 @@ const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
 const StudentDashboard = React.lazy(() => import("./pages/student/StudentDashboard"));
 const InstructorDashboard = React.lazy(() => import("./pages/instructor/InstructorDashboard"));
 const UpdateCourseWithImage = React.lazy(() => import("./pages/instructor/UpdateCourseWithImage"));
+const AdminCourses = React.lazy(() => import("./pages/admin/AdminCourses"));
 
 const DashboardRouter = () => {
-  const { user } = useAuth(); // استخدم useAuth هنا أيضاً
+  const { user, loading } = useAuth();
 
-  if (!user) {
-    return <LoadingSpinner fullScreen />;
-  }
+  if (loading) return <LoadingSpinner fullScreen />;
+  if (!user) return <Navigate to="/login" replace />;
 
-  // تحويل أدوار المستخدمين إلى سلسلة نصية لتجنب مشاكل المقارنة
-  const userRole = String(user.role).toLowerCase();
+  const userRole = user.role?.toLowerCase();
   
   switch (userRole) {
     case "admin":
@@ -48,26 +47,12 @@ const DashboardRouter = () => {
     case "student":
       return <StudentDashboard />;
     default:
-      return <Navigate to="/not-found" />;
+      return <Navigate to="/not-authorized" replace />;
   }
 };
 
 const App = () => {
-  const { isAuthenticated, user } = useAuth();
-  const navigate = useNavigate();
-
-  // تحقق من أن isAuthenticated قيمة boolean
-  const authStatus = Boolean(isAuthenticated);
-
-  // معالجة أخطاء التوجيه
-  const safeNavigate = (path) => {
-    try {
-      navigate(path);
-    } catch (error) {
-      console.error('Navigation error:', error);
-      window.location.href = path;
-    }
-  };
+  const { isAuthenticated } = useAuth();
 
   return (
     <ErrorBoundary>
@@ -83,45 +68,56 @@ const App = () => {
                 <Route path="/" element={<Home />} />
                 <Route 
                   path="/login" 
-                  element={authStatus ? <Navigate to="/courses" replace /> : <Login />} 
+                  element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} 
                 />
                 <Route 
                   path="/register" 
-                  element={authStatus ? <Navigate to="/confirm-email" replace /> : <Register />} 
+                  element={isAuthenticated ? <Navigate to="/confirm-email" replace /> : <Register />} 
                 />
-                
                 <Route path="/confirm-email" element={<ConfirmEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route 
                   path="/reset-password" 
-                 element={authStatus ? <Navigate to="/dashboard" replace /> : <ResetPassword />} 
+                  element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <ResetPassword />} 
                 />
                 <Route path="/courses/:id" element={<CourseDetails />} />
                 
                 {/* Protected Routes */}
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
+                <Route element={<ProtectedRoute />}>
+                  <Route 
+                    path="/dashboard" 
+                    element={
                       <Layout>
                         <DashboardRouter />
                       </Layout>
-                    </ProtectedRoute>
-                  }
-                />
+                    } 
+                  />
+                </Route>
 
-                <Route
-                  path="/courses/edit/:id"
-                  element={
-                    <ProtectedRoute roles={['instructor', 'admin']}>
+                <Route element={<ProtectedRoute roles={['instructor', 'admin']} />}>
+                  <Route 
+                    path="/courses/edit/:id" 
+                    element={
                       <Layout>
                         <UpdateCourseWithImage />
                       </Layout>
-                    </ProtectedRoute>
-                  }
-                />
+                    } 
+                  />
+                </Route>
 
-                {/* Fallback routes */}
+                <Route element={<ProtectedRoute roles={['admin']} />}>
+                  <Route 
+                    path="/admin/courses" 
+                    element={
+                      <Layout>
+                        <AdminCourses />
+                      </Layout>
+                    } 
+                  />
+                </Route>
+
+                {/* Error routes */}
+                <Route path="/not-authorized" element={<NotAuthorized />} />
                 <Route path="/not-found" element={<NotFound />} />
                 <Route path="*" element={<Navigate to="/not-found" replace />} />
               </Routes>

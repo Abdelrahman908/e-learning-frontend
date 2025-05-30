@@ -1,176 +1,155 @@
-// src/services/courses.js
-import axiosInstance from "../config/axios";
-import { handleApiError } from "../utils/errorHandler";
+import axiosInstance from '../config/axios';
 
-// Use environment variable with fallback to local development URL
-const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'https://localhost:7056'}/api/Course`;
-
-/**
- * Professional Course Service with complete API integration
- */
 const CourseService = {
   /**
-   * Fetches all courses with advanced filtering and pagination
-   * @param {Object} [filters={}] - Filter criteria { searchTerm, categoryId, isActive }
-   * @param {Object} [pagination={}] - Pagination { page, pageSize }
-   * @param {string} [sortField] - Field to sort by
-   * @param {string} [sortOrder] - Sort order (asc/desc)
-   * @returns {Promise<{data: Array, pagination: Object}>} - Courses and pagination info
+   * Get all courses with optional filtering and pagination
+   * @param {Object} filters - Filtering options
+   * @param {number} [filters.categoryId] - Filter by category ID
+   * @param {number} [filters.minPrice] - Minimum price filter
+   * @param {number} [filters.maxPrice] - Maximum price filter
+   * @param {string} [filters.search] - Search term
+   * @param {string} [filters.sort] - Sorting option (newest, price, rating)
+   * @param {number} [filters.page] - Page number
+   * @param {number} [filters.limit] - Items per page
+   * @returns {Promise} Axios response
    */
-  async getAllCourses(filters = {}, pagination = {}, sortField, sortOrder) {
-    try {
-      const params = {
-        ...filters,
-        ...pagination,
-        ...(sortField && { sortBy: `${sortField} ${sortOrder}` })
-      };
+  getAllCourses: async (filters = {}) => {
+    const params = {
+      pageNumber: filters.page || 1,
+      pageSize: filters.limit || 10,
+      categoryId: filters.categoryId,
+      minPrice: filters.minPrice,
+      maxPrice: filters.maxPrice,
+      search: filters.search,
+      sort: filters.sort || 'newest'
+    };
 
-      const response = await axiosInstance.get(API_BASE_URL, { 
-        params,
-        paramsSerializer: {
-          indexes: null // Properly serialize array params
-        }
-      });
+    // Remove undefined/null values
+    Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
-      return {
-        data: response.data,
-        pagination: {
-          totalItems: parseInt(response.headers['x-total-count']) || 0,
-          totalPages: Math.ceil(parseInt(response.headers['x-total-count']) / pagination.pageSize),
-          currentPage: pagination.page || 1,
-          pageSize: pagination.pageSize || 10
-        }
-      };
-    } catch (error) {
-      throw handleApiError(error, "Failed to fetch courses");
-    }
+    return await axiosInstance.get('/courses', { params });
   },
 
   /**
-   * Gets detailed course information by ID
-   * @param {number|string} id - Course ID
-   * @param {boolean} [includeReviews=false] - Include course reviews
-   * @param {boolean} [includeLessons=false] - Include course lessons
-   * @returns {Promise<CourseDetailsDto>} - Complete course details
+   * Get courses for a specific instructor
+   * @param {number} instructorId - Instructor ID
+   * @param {Object} filters - Filtering options (same as getAllCourses)
+   * @returns {Promise} Axios response
    */
-  async getCourseById(id, includeReviews = false, includeLessons = false) {
-    try {
-      const response = await axiosInstance.get(`${API_BASE_URL}/${id}`, {
-        params: {
-          includeReviews,
-          includeLessons
-        }
-      });
-      return response.data;
-    } catch (error) {
-      throw handleApiError(error, "Failed to fetch course details");
-    }
+  getInstructorCourses: async (instructorId, filters = {}) => {
+    const params = {
+      pageNumber: filters.page || 1,
+      pageSize: filters.limit || 10,
+      categoryId: filters.categoryId,
+      minPrice: filters.minPrice,
+      maxPrice: filters.maxPrice,
+      search: filters.search,
+      sort: filters.sort || 'newest'
+    };
+
+    // Remove undefined/null values
+    Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+
+    return await axiosInstance.get(`/courses/instructor/${instructorId}`, { params });
   },
 
   /**
-   * Creates a new course with image upload support
-   * @param {CourseCreateDto} courseData - Course creation data
-   * @param {File} [imageFile] - Optional course image
-   * @returns {Promise<CourseResponseDto>} - Created course data
+   * Get single course by ID
+   * @param {number} id - Course ID
+   * @returns {Promise} Axios response
    */
-  async createCourse(courseData, imageFile = null) {
-    try {
-      const formData = this._prepareFormData(courseData, imageFile);
-      const response = await axiosInstance.post(API_BASE_URL, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      return response.data;
-    } catch (error) {
-      throw handleApiError(error, "Failed to create course");
-    }
+  getCourseById: async (id) => {
+    return await axiosInstance.get(`/courses/${id}`);
   },
 
   /**
-   * Updates course information (without image changes)
-   * @param {number|string} id - Course ID
-   * @param {CourseUpdateDto} courseData - Update data
-   * @returns {Promise<CourseResponseDto>} - Updated course data
+   * Create a new course
+   * @param {Object} courseData - Course data
+   * @param {string} courseData.name - Course name
+   * @param {string} courseData.description - Course description
+   * @param {number} courseData.price - Course price
+   * @param {boolean} courseData.isActive - Course status
+   * @param {number} courseData.categoryId - Category ID
+   * @param {File} [courseData.image] - Course image file
+   * @returns {Promise} Axios response
    */
-  async updateCourse(id, courseData) {
-    try {
-      const response = await axiosInstance.put(`${API_BASE_URL}/${id}`, courseData);
-      return response.data;
-    } catch (error) {
-      throw handleApiError(error, "Failed to update course");
-    }
-  },
-
-  /**
-   * Updates course including image changes
-   * @param {number|string} id - Course ID
-   * @param {CourseUpdateDto} courseData - Update data
-   * @param {File} [imageFile] - New course image (null keeps existing)
-   * @returns {Promise<CourseResponseDto>} - Updated course data
-   */
-  async updateCourseWithImage(id, courseData, imageFile = null) {
-    try {
-      const formData = this._prepareFormData(courseData, imageFile);
-      const response = await axiosInstance.put(
-        `${API_BASE_URL}/update-with-image/${id}`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-      return response.data;
-    } catch (error) {
-      throw handleApiError(error, "Failed to update course with image");
-    }
-  },
-
-  /**
-   * Deletes a course
-   * @param {number|string} id - Course ID to delete
-   * @returns {Promise<boolean>} - True if deletion was successful
-   */
-  async deleteCourse(id) {
-    try {
-      await axiosInstance.delete(`${API_BASE_URL}/${id}`);
-      return true;
-    } catch (error) {
-      throw handleApiError(error, "Failed to delete course");
-    }
-  },
-
-  /**
-   * Private method to prepare FormData for multipart requests
-   * @private
-   */
-  _prepareFormData(data, file) {
+  createCourse: async (courseData) => {
     const formData = new FormData();
     
-    // Append all data fields (handles nested objects)
-    const flattenObject = (obj, prefix = '') => {
-      Object.entries(obj).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          const fullKey = prefix ? `${prefix}[${key}]` : key;
-          
-          if (typeof value === 'object' && !(value instanceof File)) {
-            flattenObject(value, fullKey);
-          } else {
-            formData.append(fullKey, value);
-          }
+    // Append all fields to formData
+    Object.keys(courseData).forEach(key => {
+      if (courseData[key] !== undefined && courseData[key] !== null) {
+        formData.append(key, courseData[key]);
+      }
+    });
+
+    return await axiosInstance.post('/courses', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
+
+  /**
+   * Update an existing course
+   * @param {number} id - Course ID
+   * @param {Object} courseData - Updated course data
+   * @param {string} [courseData.name] - Course name
+   * @param {string} [courseData.description] - Course description
+   * @param {number} [courseData.price] - Course price
+   * @param {boolean} [courseData.isActive] - Course status
+   * @param {number} [courseData.categoryId] - Category ID
+   * @param {File} [courseData.image] - New course image
+   * @returns {Promise} Axios response
+   */
+  updateCourse: async (id, courseData) => {
+    // If there's an image file, use multipart form
+    if (courseData.image) {
+      const formData = new FormData();
+      
+      Object.keys(courseData).forEach(key => {
+        if (courseData[key] !== undefined && courseData[key] !== null) {
+          formData.append(key, courseData[key]);
         }
       });
-    };
-    
-    flattenObject(data);
-    
-    // Append file if provided
-    if (file) {
-      formData.append("imageFile", file);
+
+      return await axiosInstance.put(`/courses/update-with-image/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
     }
-    
-    return formData;
+
+    // Otherwise use regular JSON
+    return await axiosInstance.put(`/courses/${id}`, courseData);
+  },
+
+  /**
+   * Delete a course
+   * @param {number} id - Course ID
+   * @returns {Promise} Axios response
+   */
+  deleteCourse: async (id) => {
+    return await axiosInstance.delete(`/courses/${id}`);
+  },
+
+  /**
+   * Get popular courses (custom endpoint if available)
+   * @param {number} limit - Number of courses to return
+   * @returns {Promise} Axios response
+   */
+  getPopularCourses: async (limit = 4) => {
+    return await axiosInstance.get('/courses/popular', { params: { limit } });
+  },
+
+  /**
+   * Get related courses (custom endpoint if available)
+   * @param {number} courseId - Current course ID
+   * @param {number} limit - Number of related courses to return
+   * @returns {Promise} Axios response
+   */
+  getRelatedCourses: async (courseId, limit = 3) => {
+    return await axiosInstance.get(`/courses/${courseId}/related`, { params: { limit } });
   }
 };
 

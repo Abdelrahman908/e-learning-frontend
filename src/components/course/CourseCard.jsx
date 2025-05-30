@@ -1,77 +1,68 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
-import { Button } from '../ui/Button';
-import { Rating } from '../ui/Rating';
+import PropTypes from 'prop-types';
+import Rating from '@mui/material/Rating';
 
 const CourseCard = ({ course, isInstructor = false }) => {
-  const {
-    id,
-    name,
-    price,
-    imageUrl,
-    description,
-    averageRating,
-    instructorName
-  } = course;
-
-  const truncatedDescription = description.length > 100 
-    ? `${description.substring(0, 100)}...` 
-    : description;
-
   return (
-    <div className="card h-100 shadow-sm">
-      {imageUrl && (
+    <div className="course-card">
+      <div className="course-image-container">
         <img
-          src={imageUrl}
-          className="card-img-top"
-          alt={name}
-          style={{ height: '180px', objectFit: 'cover' }}
-          loading="lazy"
+          src={course.imageUrl || '/images/courses/default.jpg'}
+          alt={course.name}
+          className="course-image"
+          onError={(e) => e.target.src = '/images/courses/default.jpg'}
         />
-      )}
-      
-      <div className="card-body d-flex flex-column">
-        <div className="d-flex justify-content-between align-items-start mb-2">
-          <h5 className="card-title mb-0">{name}</h5>
-          {price > 0 && (
-            <span className="badge bg-success">${price.toFixed(2)}</span>
-          )}
-        </div>
-        
-        {averageRating && <Rating value={averageRating} className="mb-2" />}
-        
-        <p className="card-text text-muted flex-grow-1">
-          {truncatedDescription}
-        </p>
-        
-        <div className="d-flex justify-content-between align-items-center">
-          <Link 
-            to={`/courses/${id}`} 
-            className="btn btn-primary btn-sm"
-            aria-label={`View details of ${name}`}
-          >
-            View Details
-          </Link>
-          
-          {isInstructor && (
-            <div className="d-flex gap-2">
-              <Link
-                to={`/instructor/courses/edit/${id}`}
-                className="btn btn-outline-secondary btn-sm"
-                aria-label={`Edit course ${name}`}
-              >
-                Edit
-              </Link>
-            </div>
-          )}
-        </div>
+        {course.isActive || <div className="course-inactive-badge">غير نشط</div>}
       </div>
       
-      <div className="card-footer bg-transparent">
-        <small className="text-muted">
-          Instructor: {instructorName}
-        </small>
+      <div className="course-content">
+        <div className="course-meta">
+          <span className="course-category">{course.categoryName}</span>
+          <div className="course-rating">
+            <Rating 
+              value={course.averageRating || 0} 
+              precision={0.5} 
+              readOnly 
+              size="small"
+            />
+            <span>({course.reviewCount || 0})</span>
+          </div>
+        </div>
+        
+        <h3 className="course-title">{course.name}</h3>
+        
+        <p className="course-description">
+          {course.description?.substring(0, 100)}{course.description?.length > 100 && '...'}
+        </p>
+        
+        <div className="course-footer">
+          <div className="course-price">
+            {course.price > 0 ? (
+              <>
+                <span className="price-amount">{course.price} ج.م</span>
+                {course.originalPrice > course.price && (
+                  <span className="original-price">{course.originalPrice} ج.م</span>
+                )}
+              </>
+            ) : (
+              <span className="price-free">مجاني</span>
+            )}
+          </div>
+          
+          {isInstructor ? (
+            <Link 
+              to={`/instructor/courses/${course.id}`} 
+              className="btn btn-outline"
+            >
+              إدارة الدورة
+            </Link>
+          ) : (
+            <Link to={`/courses/${course.id}`} className="btn btn-primary">
+              عرض التفاصيل
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -79,13 +70,16 @@ const CourseCard = ({ course, isInstructor = false }) => {
 
 CourseCard.propTypes = {
   course: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    id: PropTypes.number.isRequired,
     name: PropTypes.string.isRequired,
+    description: PropTypes.string,
     price: PropTypes.number,
+    originalPrice: PropTypes.number,
     imageUrl: PropTypes.string,
-    description: PropTypes.string.isRequired,
+    isActive: PropTypes.bool,
+    categoryName: PropTypes.string,
     averageRating: PropTypes.number,
-    instructorName: PropTypes.string.isRequired
+    reviewCount: PropTypes.number
   }).isRequired,
   isInstructor: PropTypes.bool
 };

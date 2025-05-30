@@ -124,49 +124,66 @@ export const AuthProvider = ({ children }) => {
    * @param {boolean} [rememberMe=false] - Remember user session
    * @returns {Promise<Object>} Response object with success status and user data or error
    */
-  const login = useCallback(async (credentials, rememberMe = false) => {
-    updateAuthState({ loading: true, error: null });
-    
-    try {
-      const response = await apiLoginUser({
-        email: credentials.email,
-        password: credentials.password,
-        rememberMe
-      });
+ const login = useCallback(async (credentials, rememberMe = false) => {
+  updateAuthState({ loading: true, error: null });
+  
+  try {
+    const response = await apiLoginUser({
+      email: credentials.email,
+      password: credentials.password,
+      rememberMe
+    });
 
-      const { user, token, refreshToken, message } = response.data;
+    const { user, token, refreshToken, message } = response.data;
 
-      if (!user || !token) {
-        throw new Error(message || 'Login failed - no user or token received');
-      }
-
-      persistAuthData({ user, token, refreshToken, rememberMe });
-      toast.success(message || 'تم تسجيل الدخول بنجاح');
-      
-      // Redirect to intended page or default
-      const origin = location.state?.from?.pathname || '/dashboard';
-      navigate(origin);
-      return { success: true, user };
-    } catch (err) {
-      let errorMsg = err.response?.data?.message || err.message;
-      
-      // Handle specific error cases
-      if (err.response?.status === 401) {
-        errorMsg = errorMsg || 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-      } else if (err.response?.status === 403) {
-        errorMsg = errorMsg || 'الحساب غير مفعل، يرجى تأكيد البريد الإلكتروني';
-      } else {
-        errorMsg = errorMsg || 'حدث خطأ أثناء تسجيل الدخول';
-      }
-
-      updateAuthState({ error: errorMsg });
-      toast.error(errorMsg);
-      return { success: false, error: errorMsg };
-    } finally {
-      updateAuthState({ loading: false });
+    if (!user || !token) {
+      throw new Error(message || 'Login failed - no user or token received');
     }
-  }, [navigate, location, persistAuthData, updateAuthState]);
 
+    // 1. حفظ البيانات في localStorage
+    localStorage.setItem('token', token);
+    localStorage.setItem('refreshToken', refreshToken);
+    localStorage.setItem('user', JSON.stringify(user));
+    
+    // 2. تعيين header الـ Authorization لـ axios
+    axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    
+    // 3. تحديث حالة المصادقة
+    updateAuthState({
+      user,
+      token,
+      refreshToken,
+      isTokenValid: true,
+      loading: false,
+      error: null,
+      lastActivity: Date.now()
+    });
+
+    toast.success(message || 'تم تسجيل الدخول بنجاح');
+    
+    // 4. التوجيه بعد تحديث الحالة
+    const origin = location.state?.from?.pathname || '/dashboard';
+    navigate(origin);
+    
+    return { success: true, user };
+  } catch (err) {
+    let errorMsg = err.response?.data?.message || err.message;
+    
+    if (err.response?.status === 401) {
+      errorMsg = errorMsg || 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+    } else if (err.response?.status === 403) {
+      errorMsg = errorMsg || 'الحساب غير مفعل، يرجى تأكيد البريد الإلكتروني';
+    } else {
+      errorMsg = errorMsg || 'حدث خطأ أثناء تسجيل الدخول';
+    }
+
+    updateAuthState({ error: errorMsg });
+    toast.error(errorMsg);
+    return { success: false, error: errorMsg };
+  } finally {
+    updateAuthState({ loading: false });
+  }
+}, [navigate, location, updateAuthState]);
   /**
    * Handles user registration
    * @param {Object} userData - User registration data
