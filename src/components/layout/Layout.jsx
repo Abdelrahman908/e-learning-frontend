@@ -23,7 +23,7 @@ const Layout = ({ children }) => {
 
   // Show loading spinner while authenticating
   if (loading) {
-    return <LoadingSpinner fullScreen />;
+return <LoadingSpinner fullscreen />;
   }
 
   // Redirect to login if not authenticated

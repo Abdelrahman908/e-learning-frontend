@@ -1,24 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import axios from '../../config/axios';
-import { Card, CardContent, Grid, Typography, CircularProgress, List, ListItem, ListItemText } from '@mui/material';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+import React, { useState, useEffect } from 'react';
+import { Card, Statistic, Row, Col, Table, Progress } from 'antd';
+import { 
+  BookOutlined, 
+  TeamOutlined, 
+  MoneyCollectOutlined 
+} from '@ant-design/icons';
+import dashboardService from '../../services/dashboard';
 
 const InstructorDashboard = () => {
-  const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('/api/dashboard/instructor');
-        setDashboardData(response.data);
-      } catch (err) {
-        setError(err.response?.data?.message || 'حدث خطأ أثناء جلب البيانات');
+        const data = await dashboardService.getInstructorDashboard();
+        setDashboardData(data);
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
       } finally {
         setLoading(false);
       }
@@ -27,98 +26,104 @@ const InstructorDashboard = () => {
     fetchData();
   }, []);
 
-  if (loading) return <CircularProgress />;
-  if (error) return <Typography color="error">{error}</Typography>;
+  if (loading) return <div>جاري التحميل...</div>;
 
-  const courseData = [
-    { name: 'عدد الكورسات', value: dashboardData.coursesCount },
-    { name: 'إجمالي الطلاب', value: dashboardData.totalStudents },
+  // بيانات جدول الكورسات
+  const coursesData = [
+    { id: 1, title: 'البرمجة بلغة Python', students: 45, revenue: 4500, rating: 4.7 },
+    { id: 2, title: 'تطوير تطبيقات الجوال', students: 32, revenue: 3200, rating: 4.8 },
+    { id: 3, title: 'تعلم الآلة', students: 28, revenue: 4200, rating: 4.9 },
+  ];
+
+  const columns = [
+    { title: 'اسم الكورس', dataIndex: 'title', key: 'title' },
+    { title: 'عدد الطلاب', dataIndex: 'students', key: 'students' },
+    { title: 'الإيرادات', dataIndex: 'revenue', key: 'revenue', render: text => `${text} ج.م` },
+    { 
+      title: 'التقييم', 
+      dataIndex: 'rating', 
+      key: 'rating',
+      render: rating => (
+        <Progress percent={rating * 20} status="active" format={() => rating} />
+      )
+    },
   ];
 
   return (
     <div style={{ padding: '20px' }}>
-      <Typography variant="h4" gutterBottom>
-        لوحة تحكم المدرب
-      </Typography>
-
-      <Grid container spacing={3}>
-        {/* إحصائيات رئيسية */}
-        <Grid item xs={12} md={4}>
+      <h1 style={{ marginBottom: '24px', textAlign: 'center' }}>لوحة تحكم المدرس</h1>
+      
+      <Row gutter={16}>
+        <Col span={8}>
           <Card>
-            <CardContent>
-              <Typography color="textSecondary">عدد الكورسات</Typography>
-              <Typography variant="h4">{dashboardData.coursesCount}</Typography>
-            </CardContent>
+            <Statistic
+              title="عدد الكورسات"
+              value={dashboardData.CoursesCount}
+              prefix={<BookOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
           </Card>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
+        </Col>
+        
+        <Col span={8}>
           <Card>
-            <CardContent>
-              <Typography color="textSecondary">إجمالي الطلاب</Typography>
-              <Typography variant="h4">{dashboardData.totalStudents}</Typography>
-            </CardContent>
+            <Statistic
+              title="إجمالي الطلاب"
+              value={dashboardData.TotalStudents}
+              prefix={<TeamOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
           </Card>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
+        </Col>
+        
+        <Col span={8}>
           <Card>
-            <CardContent>
-              <Typography color="textSecondary">إجمالي الأرباح</Typography>
-              <Typography variant="h4">${dashboardData.totalEarnings.toFixed(2)}</Typography>
-            </CardContent>
+            <Statistic
+              title="إجمالي الأرباح"
+              value={dashboardData.TotalEarnings}
+              prefix={<MoneyCollectOutlined />}
+              suffix="ج.م"
+              valueStyle={{ color: '#722ed1' }}
+            />
           </Card>
-        </Grid>
+        </Col>
+      </Row>
 
-        {/* مخطط دائري */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>نظرة عامة</Typography>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={courseData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {courseData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
+      <Row style={{ marginTop: '24px' }}>
+        <Col span={24}>
+          <Card title="الكورسات الخاصة بك">
+            <Table 
+              dataSource={coursesData} 
+              columns={columns} 
+              pagination={false} 
+              rowKey="id"
+            />
           </Card>
-        </Grid>
+        </Col>
+      </Row>
 
-        {/* كورساتي */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>آخر الإحصائيات</Typography>
-              <List>
-                <ListItem>
-                  <ListItemText primary="متوسط تقييم الكورسات" secondary="4.5/5" />
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="أعلى كورس من حيث الإيرادات" secondary="كورس React المتقدم" />
-                </ListItem>
-                <ListItem>
-                  <ListItemText primary="أعلى كورس من حيث التقييم" secondary="كورس Node.js" />
-                </ListItem>
-              </List>
-            </CardContent>
+      <Row gutter={16} style={{ marginTop: '24px' }}>
+        <Col span={12}>
+          <Card title="الإيرادات الشهرية">
+            <div style={{ height: '300px', textAlign: 'center' }}>
+              <p>رسم بياني سيظهر هنا</p>
+            </div>
           </Card>
-        </Grid>
-      </Grid>
+        </Col>
+        
+        <Col span={12}>
+          <Card title="أحدث التعليقات">
+            <div style={{ padding: '16px' }}>
+              <p>"الكورس رائع، شرح ممتاز!"</p>
+              <p>- أحمد محمد</p>
+              <div style={{ marginTop: '16px' }}>
+                <p>"تمارين عملية مفيدة جداً"</p>
+                <p>- سارة عبد الله</p>
+              </div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 };

@@ -1,62 +1,53 @@
 import React, { Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
+import ProtectedLoginRoute from "./components/common/ProtectedLoginRoute";
 import LoadingSpinner from "./components/ui/LoadingSpinner";
 import Layout from "./components/layout/Layout";
-import ErrorBoundary from './utils/ErrorBoundary';
+import ErrorBoundary from "./utils/ErrorBoundary";
+import DashboardRouter from "./components/DashboardRouter";
 
-// Lazy loading for better performance
+// Lazy loaded layout components
 const Navbar = React.lazy(() => import("./components/layout/Navbar"));
 const Footer = React.lazy(() => import("./components/layout/Footer"));
 const Hero = React.lazy(() => import("./components/layout/Hero"));
-const Sidebar = React.lazy(() => import("./components/layout/Sidebar"));
 const ToastContainer = React.lazy(() => import("./components/ui/ToastContainer"));
-const NotAuthorized = React.lazy(() => import("./pages/NotAuthorized"));
 
-// Public pages
+// Lazy loaded public pages
 const Home = React.lazy(() => import("./pages/Home"));
 const Login = React.lazy(() => import("./pages/auth/Login"));
 const Register = React.lazy(() => import("./pages/auth/Register"));
 const ConfirmEmail = React.lazy(() => import("./pages/auth/ConfirmEmail"));
 const ForgotPassword = React.lazy(() => import("./pages/auth/ForgotPassword"));
 const ResetPassword = React.lazy(() => import("./pages/auth/ResetPassword"));
-const CourseDetails = React.lazy(() => import("./pages/student/CourseDetails"));
+const ViewCoursePage = React.lazy(() => import("./pages/ViewCoursePage"));
+const CoursesPage = React.lazy(() => import("./pages/CoursesPage"));
+const NotAuthorized = React.lazy(() => import("./pages/NotAuthorized"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 
-// Protected pages
+// Dashboards
 const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
-const StudentDashboard = React.lazy(() => import("./pages/student/StudentDashboard"));
 const InstructorDashboard = React.lazy(() => import("./pages/instructor/InstructorDashboard"));
-const UpdateCourseWithImage = React.lazy(() => import("./pages/instructor/UpdateCourseWithImage"));
-const AdminCourses = React.lazy(() => import("./pages/admin/AdminCourses"));
+const StudentDashboard = React.lazy(() => import("./pages/student/StudentDashboard"));
 
-const DashboardRouter = () => {
-  const { user, loading } = useAuth();
+// Course management pages
+const EditCoursePage = React.lazy(() => import("./pages/EditCoursePage"));
+const PaymentPage = React.lazy(() => import("./pages/PaymentPage"));
+const ProfilePage = React.lazy(() => import("./pages/ProfilePage"));
 
-  if (loading) return <LoadingSpinner fullScreen />;
-  if (!user) return <Navigate to="/login" replace />;
+// Notifications
+const NotificationPage = React.lazy(() => import("./pages/NotificationPage"));
 
-  const userRole = user.role?.toLowerCase();
-  
-  switch (userRole) {
-    case "admin":
-      return <AdminDashboard />;
-    case "instructor":
-      return <InstructorDashboard />;
-    case "student":
-      return <StudentDashboard />;
-    default:
-      return <Navigate to="/not-authorized" replace />;
-  }
-};
+// User management pages
+const UsersPage = React.lazy(() => import("./pages/admin/UsersPage"));
+const CreateUserPage = React.lazy(() => import("./pages/admin/users/CreateUserPage"));
+const EditUserPage = React.lazy(() => import("./pages/admin/users/EditUserPage"));
+const UserDetailsPage = React.lazy(() => import("./pages/admin/UserDetailsPage"));
 
 const App = () => {
-  const { isAuthenticated } = useAuth();
-
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-white text-gray-800 flex flex-col">
+      <div className="min-h-screen flex flex-col bg-white text-gray-800">
         <Suspense fallback={<LoadingSpinner fullScreen />}>
           <Navbar />
           <Hero />
@@ -66,57 +57,130 @@ const App = () => {
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Home />} />
-                <Route 
-                  path="/login" 
-                  element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} 
+                <Route
+                  path="/login"
+                  element={
+                    <ProtectedLoginRoute>
+                      <Login />
+                    </ProtectedLoginRoute>
+                  }
                 />
-                <Route 
-                  path="/register" 
-                  element={isAuthenticated ? <Navigate to="/confirm-email" replace /> : <Register />} 
+                <Route
+                  path="/register"
+                  element={
+                    <ProtectedLoginRoute>
+                      <Register />
+                    </ProtectedLoginRoute>
+                  }
                 />
                 <Route path="/confirm-email" element={<ConfirmEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route 
-                  path="/reset-password" 
-                  element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <ResetPassword />} 
+                <Route
+                  path="/reset-password"
+                  element={
+                    <ProtectedLoginRoute>
+                      <ResetPassword />
+                    </ProtectedLoginRoute>
+                  }
                 />
-                <Route path="/courses/:id" element={<CourseDetails />} />
-                
+                <Route path="/courses" element={<CoursesPage />} />
+                <Route path="/courses/:id" element={<ViewCoursePage />} />
+
                 {/* Protected Routes */}
-                <Route element={<ProtectedRoute />}>
-                  <Route 
-                    path="/dashboard" 
-                    element={
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <ProfilePage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
                       <Layout>
                         <DashboardRouter />
                       </Layout>
-                    } 
-                  />
-                </Route>
-
-                <Route element={<ProtectedRoute roles={['instructor', 'admin']} />}>
-                  <Route 
-                    path="/courses/edit/:id" 
-                    element={
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/courses/edit/:id"
+                  element={
+                    <ProtectedRoute roles={["instructor", "admin"]} requireCourseOwnership>
                       <Layout>
-                        <UpdateCourseWithImage />
+                        <EditCoursePage />
                       </Layout>
-                    } 
-                  />
-                </Route>
-
-                <Route element={<ProtectedRoute roles={['admin']} />}>
-                  <Route 
-                    path="/admin/courses" 
-                    element={
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/courses/:id/payment"
+                  element={
+                    <ProtectedRoute roles={["student"]}>
                       <Layout>
-                        <AdminCourses />
+                        <PaymentPage />
                       </Layout>
-                    } 
-                  />
-                </Route>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/notifications"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <NotificationPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
 
-                {/* Error routes */}
+                {/* Admin Routes */}
+                <Route
+                  path="/admin/users"
+                  element={
+                    <ProtectedRoute roles={["admin"]}>
+                      <Layout>
+                        <UsersPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/create"
+                  element={
+                    <ProtectedRoute roles={["admin"]}>
+                      <Layout>
+                        <CreateUserPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/edit/:id"
+                  element={
+                    <ProtectedRoute roles={["admin"]}>
+                      <Layout>
+                        <EditUserPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/:id"
+                  element={
+                    <ProtectedRoute roles={["admin"]}>
+                      <Layout>
+                        <UserDetailsPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Error Pages */}
                 <Route path="/not-authorized" element={<NotAuthorized />} />
                 <Route path="/not-found" element={<NotFound />} />
                 <Route path="*" element={<Navigate to="/not-found" replace />} />
