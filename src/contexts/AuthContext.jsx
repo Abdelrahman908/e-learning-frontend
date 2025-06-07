@@ -1,9 +1,8 @@
 import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
-import axiosInstance from '../config/axios'; // تأكد من المسار
-
- import { toast } from 'react-toastify';
+import axiosInstance from '../config/axios';
+import { toast } from 'react-toastify';
 import {
   registerUser as apiRegisterUser,
   loginUser as apiLoginUser,
@@ -22,111 +21,98 @@ const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes of inactivity
 
 export const AuthContext = createContext();
 
-/**
- * AuthProvider component that manages authentication state and provides auth-related functions
- * @param {Object} props - Component props
- * @param {React.ReactNode} props.children - Child components
- * @returns {React.ReactElement} AuthProvider component
- */
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const checkTokenValidity = useCallback((token) => {
+    if (!token) return false;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.exp > Date.now() / 1000;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const [authState, setAuthState] = useState(() => {
     const savedUser = localStorage.getItem('user');
     const savedToken = localStorage.getItem('token');
     const savedRefreshToken = localStorage.getItem('refreshToken');
     const rememberedEmail = localStorage.getItem('rememberedEmail');
 
+    const isTokenValid = savedToken ? checkTokenValidity(savedToken) : false;
+    
     return {
       user: savedUser ? JSON.parse(savedUser) : null,
       token: savedToken,
       refreshToken: savedRefreshToken,
-      loading: false,
+      loading: !!savedToken, // تحميل فقط إذا كان هناك توكن مخزن
       error: null,
-      isTokenValid: false,
+      isTokenValid,
+      isAuthenticated: isTokenValid,
       lastActivity: Date.now(),
       rememberedEmail
     };
   });
 
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  /**
-   * Checks if a JWT token is valid
-   * @param {string} token - JWT token to validate
-   * @returns {boolean} True if token is valid, false otherwise
-   */
-  const checkTokenValidity = useCallback((token) => {
-    if (!token) return false;
-    
-    try {
-      const decoded = jwtDecode(token);
-      const currentTime = Date.now() / 1000;
-      return decoded.exp > currentTime;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  /**
-   * Updates auth state with new values
-   * @param {Object} updates - New values to merge into auth state
-   */
   const updateAuthState = useCallback((updates) => {
-    setAuthState(prev => ({
-      ...prev,
-      ...updates,
-      ...(updates.token ? { isTokenValid: checkTokenValidity(updates.token) } : {})
-    }));
+    setAuthState(prev => {
+      const newState = { ...prev, ...updates };
+      
+      // تحديث حالة التوكن عند تغييره
+      if (updates.token !== undefined) {
+        newState.isTokenValid = checkTokenValidity(updates.token);
+        newState.isAuthenticated = newState.isTokenValid;
+      }
+      
+      return newState;
+    });
   }, [checkTokenValidity]);
 
   const persistAuthData = useCallback(({ user, token, refreshToken, rememberMe }) => {
-  const authUpdates = {};
+    const authUpdates = {};
 
-  if (user) {
-    const formattedUser = {
-      id: user.Id,         // كان user.id
-      email: user.Email,   // كان user.email
-      fullName: user.FullName, // كان user.fullName
-      role: user.Role      // كان user.role
-    };
+    if (user) {
+      // استخدام الحروف الصغيرة لخصائص المستخدم
+      const formattedUser = {
+        id: user.id || user.Id,
+        email: user.email || user.Email,
+        fullName: user.fullName || user.FullName,
+        role: user.role || user.Role
+      };
+      
+      localStorage.setItem('user', JSON.stringify(formattedUser));
+      authUpdates.user = formattedUser;
+    }
     
-    localStorage.setItem('user', JSON.stringify(formattedUser));
-    authUpdates.user = formattedUser;
-  }
-  
-  if (token) {
-    localStorage.setItem('token', token);
-    authUpdates.token = token;
-  }
-  
-  if (refreshToken) {
-    localStorage.setItem('refreshToken', refreshToken);
-    authUpdates.refreshToken = refreshToken;
-  }
+    if (token) {
+      localStorage.setItem('token', token);
+      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      authUpdates.token = token;
+    }
+    
+    if (refreshToken) {
+      localStorage.setItem('refreshToken', refreshToken);
+      authUpdates.refreshToken = refreshToken;
+    }
 
-  if (rememberMe && user?.Email) {  // كان user?.email
-    localStorage.setItem('rememberedEmail', user.Email);
-    authUpdates.rememberedEmail = user.Email;
-  } else if (!rememberMe) {
-    localStorage.removeItem('rememberedEmail');
-    authUpdates.rememberedEmail = null;
-  }
+    if (rememberMe && user?.email) {
+      localStorage.setItem('rememberedEmail', user.email);
+      authUpdates.rememberedEmail = user.email;
+    } else if (!rememberMe) {
+      localStorage.removeItem('rememberedEmail');
+      authUpdates.rememberedEmail = null;
+    }
 
-  authUpdates.lastActivity = Date.now();
-  updateAuthState(authUpdates);
-}, [updateAuthState]);
+    authUpdates.lastActivity = Date.now();
+    authUpdates.isAuthenticated = true;
+    updateAuthState(authUpdates);
+  }, [updateAuthState]);
 
-  /**
-   * Handles user login
-   * @param {Object} credentials - User credentials
-   * @param {string} credentials.email - User email
-   * @param {string} credentials.password - User password
-   * @param {boolean} [rememberMe=false] - Remember user session
-   * @returns {Promise<Object>} Response object with success status and user data or error
-   */
  const login = useCallback(async (credentials, rememberMe = false) => {
-  updateAuthState({ loading: true, error: null });
-  
+  updateAuthState(prev => ({ ...prev, loading: true, error: null }));
+
   try {
     const response = await apiLoginUser({
       email: credentials.email,
@@ -134,56 +120,43 @@ export const AuthProvider = ({ children }) => {
       rememberMe
     });
 
-    const { user, token, refreshToken, message } = response.data;
+    if (!response || !response.Success || !response.Data) {
+      throw new Error(response?.Message || 'فشل تسجيل الدخول');
+    }
+
+    const { Token: token, RefreshToken: refreshToken, User: user } = response.Data;
 
     if (!user || !token) {
-      throw new Error(message || 'Login failed - no user or token received');
+      throw new Error('بيانات المستخدم أو التوكن غير موجودة');
     }
 
-    // 1. حفظ البيانات في localStorage
-    localStorage.setItem('token', token);
-    localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('user', JSON.stringify(user));
-    
-    // 2. تعيين header الـ Authorization لـ axios
+    persistAuthData({ user, token, refreshToken, rememberMe });
+
     axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    
-    // 3. تحديث حالة المصادقة
-    updateAuthState({
-      user,
-      token,
-      refreshToken,
+
+    updateAuthState(prev => ({
+      ...prev,
       isTokenValid: true,
+      isAuthenticated: true,
       loading: false,
       error: null,
-      lastActivity: Date.now()
-    });
+    }));
 
-    toast.success(message || 'تم تسجيل الدخول بنجاح');
-    
-    // 4. التوجيه بعد تحديث الحالة
-    const origin = location.state?.from?.pathname || '/dashboard';
-    navigate(origin);
-    
+    toast.success(response.Message || 'تم تسجيل الدخول بنجاح');
+
+    const origin = location.state?.from?.pathname || '/home';
+    navigate(origin, { replace: true });
+
     return { success: true, user };
   } catch (err) {
-    let errorMsg = err.response?.data?.message || err.message;
-    
-    if (err.response?.status === 401) {
-      errorMsg = errorMsg || 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-    } else if (err.response?.status === 403) {
-      errorMsg = errorMsg || 'الحساب غير مفعل، يرجى تأكيد البريد الإلكتروني';
-    } else {
-      errorMsg = errorMsg || 'حدث خطأ أثناء تسجيل الدخول';
-    }
-
-    updateAuthState({ error: errorMsg });
-    toast.error(errorMsg);
+    const errorMsg = err.message || 'حدث خطأ أثناء تسجيل الدخول';
+    updateAuthState(prev => ({ ...prev, error: errorMsg }));
     return { success: false, error: errorMsg };
   } finally {
-    updateAuthState({ loading: false });
+    updateAuthState(prev => ({ ...prev, loading: false }));
   }
 }, [navigate, location, updateAuthState]);
+
   /**
    * Handles user registration
    * @param {Object} userData - User registration data
@@ -405,17 +378,21 @@ const resetPassword = useCallback(async (email, code, newPassword) => {
    * @param {string} [message='تم تسجيل الخروج بنجاح'] - Logout message
    * @param {boolean} [sessionExpired=false] - Whether logout is due to session expiration
    */
-  const logout = useCallback((message = 'تم تسجيل الخروج بنجاح', sessionExpired = false) => {
+ const logout = useCallback((message = 'تم تسجيل الخروج بنجاح', sessionExpired = false) => {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
-    
+    delete axiosInstance.defaults.headers.common['Authorization'];
+
     updateAuthState({
       user: null,
       token: null,
       refreshToken: null,
       isTokenValid: false,
-      lastActivity: null
+      isAuthenticated: false,
+      lastActivity: null,
+        loading: false // ✅ أضف هذا
+
     });
 
     if (sessionExpired) {
@@ -432,10 +409,6 @@ const resetPassword = useCallback(async (email, code, newPassword) => {
     });
   }, [navigate, authState.rememberedEmail, authState.user?.email, updateAuthState]);
 
-  /**
-   * Refreshes authentication token
-   * @returns {Promise<string|null>} New token or null if refresh failed
-   */
   const refreshToken = useCallback(async () => {
     if (!authState.refreshToken) {
       logout('انتهت جلستك، يرجى تسجيل الدخول مرة أخرى', true);
@@ -444,24 +417,30 @@ const resetPassword = useCallback(async (email, code, newPassword) => {
 
     try {
       const response = await apiRefreshAuthToken({ refreshToken: authState.refreshToken });
-      const { token, refreshToken: newRefreshToken, message } = response.data;
+      const { token, refreshToken: newRefreshToken, message, user } = response.data;
 
       if (!token) {
-        throw new Error(message || 'Failed to refresh token');
+        throw new Error(message || 'فشل في تجديد التوكن');
       }
 
-      persistAuthData({ token, refreshToken: newRefreshToken });
+      persistAuthData({ token, refreshToken: newRefreshToken, user });
+      updateAuthState({
+        token,
+        refreshToken: newRefreshToken,
+        user,
+        isTokenValid: true,
+        isAuthenticated: true,
+        lastActivity: Date.now(),
+      });
+
       return token;
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || 'حدث خطأ أثناء تجديد الجلسة';
       logout(errorMsg, true);
       return null;
     }
-  }, [authState.refreshToken, logout, persistAuthData]);
+  }, [authState.refreshToken, logout, persistAuthData, updateAuthState]);
 
-  /**
-   * Updates last activity timestamp
-   */
   const updateLastActivity = useCallback(() => {
     updateAuthState({ lastActivity: Date.now() });
   }, [updateAuthState]);
@@ -471,25 +450,32 @@ const resetPassword = useCallback(async (email, code, newPassword) => {
     if (!authState.token) return;
 
     const checkToken = async () => {
-      const isValid = checkTokenValidity(authState.token);
-      updateAuthState({ isTokenValid: isValid });
+      try {
+        const isValid = checkTokenValidity(authState.token);
+        updateAuthState({ 
+          isTokenValid: isValid,
+          isAuthenticated: isValid
+        });
 
-      if (!isValid) {
-        await refreshToken();
-      } else {
-        const decoded = jwtDecode(authState.token);
-        const expiresIn = (decoded.exp * 1000) - Date.now();
-        
-        if (expiresIn < TOKEN_REFRESH_THRESHOLD) {
+        if (!isValid) {
           await refreshToken();
+        } else {
+          const decoded = jwtDecode(authState.token);
+          const expiresIn = decoded.exp * 1000 - Date.now();
+
+          if (expiresIn < TOKEN_REFRESH_THRESHOLD) {
+            await refreshToken();
+          }
         }
+      } catch (err) {
+        logout('خطأ أثناء التحقق من التوكن', true);
       }
     };
 
     checkToken();
     const interval = setInterval(checkToken, TOKEN_CHECK_INTERVAL);
     return () => clearInterval(interval);
-  }, [authState.token, checkTokenValidity, refreshToken, updateAuthState]);
+  }, [authState.token, refreshToken, updateAuthState]);
 
   // Check for session timeout due to inactivity
   useEffect(() => {
@@ -505,51 +491,55 @@ const resetPassword = useCallback(async (email, code, newPassword) => {
     const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart'];
     const handleActivity = () => updateLastActivity();
 
-    // Add event listeners for user activity
-    activityEvents.forEach(event => {
-      window.addEventListener(event, handleActivity);
-    });
-
-    const inactivityInterval = setInterval(checkInactivity, 10000); // Check every 10 seconds
+    activityEvents.forEach(event => window.addEventListener(event, handleActivity));
+    const inactivityInterval = setInterval(checkInactivity, 10000);
 
     return () => {
-      activityEvents.forEach(event => {
-        window.removeEventListener(event, handleActivity);
-      });
+      activityEvents.forEach(event => window.removeEventListener(event, handleActivity));
       clearInterval(inactivityInterval);
     };
   }, [authState.token, authState.lastActivity, logout, updateLastActivity]);
 
- // Validate token on initial load (local validation only)
-useEffect(() => {
-  const verifyInitialToken = () => {
-    if (authState.token) {
-      try {
-        const decoded = jwtDecode(authState.token);
-        const isTokenValid = decoded.exp > Date.now() / 1000;
-        
-        updateAuthState({ isTokenValid });
-        
-        if (!isTokenValid) {
-          logout('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى', true);
-        }
-      } catch (error) {
-        console.error('Token validation error:', error);
-        logout('جلسة غير صالحة، يرجى تسجيل الدخول مرة أخرى', true);
+  // Validate token on initial load
+  useEffect(() => {
+    const verifyInitialToken = () => {
+      if (authState.token) {
+        try {
+          const isTokenValid = checkTokenValidity(authState.token);
+          updateAuthState({ 
+            isTokenValid,
+            isAuthenticated: isTokenValid
+          });
+
+          if (!isTokenValid) {
+            logout('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى', true);
+          }
+        } catch (error) {
+  console.error('Token validation error:', error);
+  updateAuthState({ loading: false }); // ✅ أضف هذا
+  logout('جلسة غير صالحة، يرجى تسجيل الدخول مرة أخرى', true);
+}
+
+      } else {
+        updateAuthState({ loading: false });
       }
-    }
-  };
+    };
 
-  verifyInitialToken();
-}, [authState.token, logout, updateAuthState]);
+    verifyInitialToken();
+  }, [authState.token, logout, updateAuthState]);
 
-  // Context value
+  // دوال التحقق من نوع المستخدم
+  const isInstructor = () => authState.user?.role === 'Instructor';
+  const isStudent = () => authState.user?.role === 'Student';
+  const isAdmin = () => authState.user?.role === 'Admin';
+
+  // سياق المصادقة
   const contextValue = useMemo(() => ({
     user: authState.user,
     token: authState.token,
     loading: authState.loading,
     error: authState.error,
-    isAuthenticated: authState.isTokenValid,
+    isAuthenticated: authState.isAuthenticated,
     rememberedEmail: authState.rememberedEmail,
     login,
     register,
@@ -559,21 +549,30 @@ useEffect(() => {
     resetPassword,
     logout,
     refreshToken,
+    updateLastActivity,
+    isInstructor,
+    isStudent,
+    isAdmin
+  }), [
+    authState,
+    login,
+    register,
+    confirmEmail,
+    resendConfirmation,
+    forgotPassword,
+    resetPassword,
+    logout,
+    refreshToken,
     updateLastActivity
-  }), [authState, login, register, confirmEmail, resendConfirmation, forgotPassword, resetPassword, logout, refreshToken, updateLastActivity]);
+  ]);
 
   return (
     <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
-
 };
-/**
- * Custom hook to access auth context
- * @returns {Object} Auth context value
- * @throws {Error} If used outside AuthProvider
- */
+
 export const useAuth = () => {
   const context = React.useContext(AuthContext);
   if (context === undefined) {

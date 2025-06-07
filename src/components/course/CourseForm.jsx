@@ -1,215 +1,171 @@
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useCategories } from '../../hooks/useCategories';
-import CourseService from '../../services/courses';
-import LoadingSpinner from '../ui/LoadingSpinner';
-import FileUpload from '../ui/FileUpload';
+import { useState, useEffect } from 'react';
+import {
+  Form,
+  Input,
+  InputNumber,
+  Switch,
+  Select,
+  Upload,
+  Button,
+  message,
+} from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
+import useAuth from '../../hooks/useAuth';
 
-const CourseForm = ({ isEdit = false }) => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const { categories, loading: categoriesLoading } = useCategories();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
+const { TextArea } = Input;
+const { Option } = Select;
 
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    reset,
-    formState: { errors }
-  } = useForm();
+const CourseForm = ({ initialValues, onSubmit, isEdit = false, categories = [] }) => {
+  const [form] = Form.useForm();
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [fileList, setFileList] = useState([]);
 
   useEffect(() => {
-    if (isEdit && id) {
-      const fetchCourse = async () => {
-        try {
-          const response = await CourseService.getCourseById(id);
-          const course = response.data;
-          
-          reset({
-            name: course.name,
-            description: course.description,
-            price: course.price,
-            isActive: course.isActive,
-            categoryId: course.categoryId
-          });
-          
-          if (course.imageUrl) {
-            setPreviewImage(course.imageUrl);
-          }
-        } catch (err) {
-          setError(err.response?.data?.message || 'فشل في تحميل بيانات الدورة');
-        }
-      };
-      
-      fetchCourse();
+    if (initialValues?.imageUrl) {
+      setFileList([
+        {
+          uid: '-1',
+          name: 'صورة الكورس الحالية',
+          status: 'done',
+          url: initialValues.imageUrl,
+        },
+      ]);
     }
-  }, [id, isEdit, reset]);
+  }, [initialValues]);
 
-  const onSubmit = async (data) => {
-    setIsSubmitting(true);
-    setError(null);
+  const beforeUpload = (file) => {
+    const isImage = file.type.startsWith('image/');
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isImage) {
+      message.error('الملف يجب أن يكون صورة');
+    }
+    if (!isLt2M) {
+      message.error('الصورة يجب أن تكون أقل من 2MB');
+    }
+    return isImage && isLt2M;
+  };
+
+  const handleChange = ({ fileList: newFileList }) => {
+    setFileList(newFileList);
+  };
+
+  const onFinish = async (values) => {
+    if (!user) {
+      message.error('المستخدم غير معروف، يرجى تسجيل الدخول مجددًا');
+      return;
+    }
 
     try {
-      const formData = {
-        ...data,
-        price: parseFloat(data.price),
-        isActive: data.isActive === 'true',
-        categoryId: parseInt(data.categoryId),
-        image: data.image?.[0] || null
-      };
+      setLoading(true);
+      const formData = new FormData();
 
-      let response;
-      if (isEdit) {
-        response = await CourseService.updateCourse(id, formData);
-      } else {
-        response = await CourseService.createCourse(formData);
+      formData.append('Name', values.name);
+      formData.append('Title', values.title?.trim() || '');
+      formData.append('Description', values.description);
+      formData.append('Price', values.price);
+      formData.append('IsActive', values.isActive);
+      formData.append('CategoryId', values.categoryId);
+      formData.append('InstructorId', user?.sub || user?.userId);
+
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        formData.append('ImageFile', fileList[0].originFileObj);
       }
 
-      navigate(isEdit 
-        ? `/instructor/courses/${id}`
-        : `/instructor/courses/${response.data.id}`
-      );
-    } catch (err) {
-      setError(err.response?.data?.message || 'حدث خطأ أثناء حفظ الدورة');
+      await onSubmit(formData);
+      message.success(`تم ${isEdit ? 'تحديث' : 'إنشاء'} الكورس بنجاح`);
+    } catch (error) {
+      message.error(error?.response?.data?.message || 'حدث خطأ ما');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
-
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setValue('image', [file]);
-      setPreviewImage(URL.createObjectURL(file));
-    }
-  };
-
-  if (categoriesLoading) return <LoadingSpinner />;
 
   return (
-    <div className="course-form-container">
-      <h2>{isEdit ? 'تعديل الدورة' : 'إنشاء دورة جديدة'}</h2>
-      
-      {error && <div className="message message-error">{error}</div>}
+    <Form
+      form={form}
+      layout="vertical"
+      onFinish={onFinish}
+      initialValues={{
+        isActive: true,
+        ...initialValues,
+      }}
+    >
+      <Form.Item
+        name="name"
+        label="اسم الكورس"
+        rules={[{ required: true, message: 'الرجاء إدخال اسم الكورس' }]}
+      >
+        <Input placeholder="أدخل اسم الكورس" />
+      </Form.Item>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="form-group">
-          <label htmlFor="name">اسم الدورة *</label>
-          <input
-            id="name"
-            type="text"
-            {...register('name', { required: 'اسم الدورة مطلوب' })}
-            className={errors.name ? 'error' : ''}
-          />
-          {errors.name && (
-            <span className="error-message">{errors.name.message}</span>
-          )}
-        </div>
+      <Form.Item name="title" label="العنوان">
+        <Input placeholder="أدخل العنوان" />
+      </Form.Item>
 
-        <div className="form-group">
-          <label htmlFor="description">وصف الدورة *</label>
-          <textarea
-            id="description"
-            rows="5"
-            {...register('description', { required: 'وصف الدورة مطلوب' })}
-            className={errors.description ? 'error' : ''}
-          />
-          {errors.description && (
-            <span className="error-message">{errors.description.message}</span>
-          )}
-        </div>
+      <Form.Item
+        name="description"
+        label="الوصف"
+        rules={[{ required: true, message: 'الرجاء إدخال وصف الكورس' }]}
+      >
+        <TextArea rows={4} placeholder="أدخل وصفًا للكورس" />
+      </Form.Item>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="price">السعر (ج.م) *</label>
-            <input
-              id="price"
-              type="number"
-              step="0.01"
-              min="0"
-              {...register('price', { 
-                required: 'السعر مطلوب',
-                min: { value: 0, message: 'يجب أن يكون السعر رقم موجب' }
-              })}
-              className={errors.price ? 'error' : ''}
-            />
-            {errors.price && (
-              <span className="error-message">{errors.price.message}</span>
-            )}
-          </div>
+      <Form.Item
+        name="price"
+        label="السعر"
+        rules={[{ required: true, message: 'الرجاء إدخال السعر' }]}
+      >
+        <InputNumber
+          min={0}
+          formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+          parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+          style={{ width: '100%' }}
+        />
+      </Form.Item>
 
-          <div className="form-group">
-            <label htmlFor="categoryId">التصنيف *</label>
-            <select
-              id="categoryId"
-              {...register('categoryId', { required: 'التصنيف مطلوب' })}
-              className={errors.categoryId ? 'error' : ''}
-            >
-              <option value="">اختر تصنيفاً</option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-            {errors.categoryId && (
-              <span className="error-message">{errors.categoryId.message}</span>
-            )}
-          </div>
-        </div>
+      <Form.Item
+        name="categoryId"
+        label="التصنيف"
+        rules={[{ required: true, message: 'الرجاء اختيار تصنيف' }]}
+      >
+        <Select placeholder="اختر التصنيف">
+          {categories.map((cat) => (
+            <Option key={cat.id} value={cat.id}>
+              {cat.name}
+            </Option>
+          ))}
+        </Select>
+      </Form.Item>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label htmlFor="isActive">حالة الدورة</label>
-            <select
-              id="isActive"
-              {...register('isActive')}
-            >
-              <option value="true">نشطة</option>
-              <option value="false">غير نشطة</option>
-            </select>
-          </div>
+      <Form.Item name="isActive" label="نشط" valuePropName="checked">
+        <Switch />
+      </Form.Item>
 
-          <div className="form-group">
-            <label>صورة الدورة</label>
-            <FileUpload
-              accept="image/*"
-              onChange={handleImageChange}
-              preview={previewImage}
-            />
-          </div>
-        </div>
+      <Form.Item label="صورة الكورس">
+        <Upload
+          listType="picture"
+          fileList={fileList}
+          beforeUpload={beforeUpload}
+          onChange={handleChange}
+          maxCount={1}
+          accept="image/*"
+          customRequest={({ file, onSuccess }) => {
+            setTimeout(() => {
+              onSuccess('ok');
+            }, 0);
+          }}
+        >
+          <Button icon={<UploadOutlined />}>رفع صورة</Button>
+        </Upload>
+      </Form.Item>
 
-        <div className="form-actions">
-          <button 
-            type="submit" 
-            className="btn btn-primary"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <LoadingSpinner size="small" />
-                <span>جاري الحفظ...</span>
-              </>
-            ) : (
-              <span>{isEdit ? 'حفظ التعديلات' : 'إنشاء الدورة'}</span>
-            )}
-          </button>
-          
-          <button 
-            type="button" 
-            className="btn btn-outline"
-            onClick={() => navigate(-1)}
-          >
-            إلغاء
-          </button>
-        </div>
-      </form>
-    </div>
+      <Form.Item>
+        <Button type="primary" htmlType="submit" loading={loading}>
+          {isEdit ? 'تحديث الكورس' : 'إنشاء الكورس'}
+        </Button>
+      </Form.Item>
+    </Form>
   );
 };
 

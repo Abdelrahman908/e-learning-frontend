@@ -1,115 +1,102 @@
-import React from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useQuery } from 'react-query';
-import axios from '../../config/axios';
-import { Grid, Typography } from '@mui/material';
-import { Book, School, Payment } from '@mui/icons-material';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import DashboardCard from '../../components/dashboard/DashboardCard';
-import DashboardError from '../../components/dashboard/DashboardError';
-import DashboardSkeleton from '../../components/dashboard/DashboardSkeleton';
-import Layout from '../../components/layout/Layout';
+import React, { useState, useEffect } from 'react';
+import { Card, Statistic, Row, Col, Progress, List } from 'antd';
+import { UserOutlined, BookOutlined, DollarOutlined } from '@ant-design/icons';
+import dashboardService from '../../services/dashboard';
 
 const StudentDashboard = () => {
-  const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const { data, isLoading, error, refetch } = useQuery('studentDashboard', async () => {
-    const response = await axios.get('/api/dashboard/student');
-    return response.data;
-  }, {
-    staleTime: 5 * 60 * 1000, // 5 دقائق cache
-    retry: 2,
-  });
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await dashboardService.getStudentDashboard();
+        setDashboardData(data);
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  if (isLoading) return <DashboardSkeleton />;
-  if (error) return <DashboardError refetch={refetch} />;
+    fetchData();
+  }, []);
 
-  // بيانات التقدم الدراسي
-  const progressData = [
-    { name: 'الأسبوع 1', progress: 20 },
-    { name: 'الأسبوع 2', progress: 45 },
-    { name: 'الأسبوع 3', progress: 60 },
-    { name: 'الأسبوع 4', progress: 75 },
-  ];
+  if (loading) return <div>جاري التحميل...</div>;
 
   return (
-    <Layout>
-      <Typography variant="h4" gutterBottom sx={{ mb: 4, textAlign: 'center' }}>
-        لوحة تحكم الطالب
-      </Typography>
+    <div style={{ padding: '20px' }}>
+      <h1 style={{ marginBottom: '24px', textAlign: 'center' }}>لوحة تحكم الطالب</h1>
+      
+      <Row gutter={16}>
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="الكورسات المسجلة"
+              value={dashboardData.EnrolledCourses}
+              prefix={<BookOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Card>
+        </Col>
+        
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="إجمالي المدفوعات"
+              value={dashboardData.TotalPaid}
+              prefix={<DollarOutlined />}
+              suffix="ج.م"
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        
+        <Col span={8}>
+          <Card>
+            <Statistic
+              title="الكورسات المكتملة"
+              value={dashboardData.CompletedCourses || 0}
+              prefix={<UserOutlined />}
+              valueStyle={{ color: '#722ed1' }}
+            />
+          </Card>
+        </Col>
+      </Row>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
-          <DashboardCard 
-            title="الكورسات المسجلة" 
-            value={data.enrolledCourses} 
-            icon={<Book />}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <DashboardCard 
-            title="إجمالي المدفوعات" 
-            value={`$${data.totalPaid.toFixed(2)}`}
-            icon={<Payment />}
-            color="success"
-          />
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <DashboardCard 
-            title="معدل الإكمال" 
-            value={`${data.completionRate || 0}%`} 
-            icon={<School />}
-            color="info"
-          />
-        </Grid>
-
-        <Grid item xs={12} md={8}>
-          <DashboardCard title="تقدمك الدراسي">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={progressData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="progress" 
-                  stroke="#8884d8" 
-                  strokeWidth={2}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </DashboardCard>
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <DashboardCard title="ملخص الكورسات">
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <DashboardCard 
-                  title="الكورسات النشطة" 
-                  value={`${data.activeCourses || 0}`} 
-                  variant="outlined"
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <DashboardCard 
-                  title="الكورسات المكتملة" 
-                  value={`${data.completedCourses || 0}`} 
-                  variant="outlined"
-                  size="small"
-                  color="success"
-                />
-              </Grid>
-            </Grid>
-          </DashboardCard>
-        </Grid>
-      </Grid>
-    </Layout>
+      <Row gutter={16} style={{ marginTop: '24px' }}>
+        <Col span={12}>
+          <Card title="تقدم الكورسات">
+            <Progress
+              percent={dashboardData.AverageQuizScore || 0}
+              status="active"
+              strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
+            />
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <p>متوسط درجات الاختبارات: {dashboardData.AverageQuizScore || 0}%</p>
+            </div>
+          </Card>
+        </Col>
+        
+        <Col span={12}>
+          <Card title="آخر الكورسات">
+            <List
+              dataSource={dashboardData.Courses || []}
+              renderItem={item => (
+                <List.Item>
+                  <List.Item.Meta
+                    title={item.title}
+                    description={`تاريخ التسجيل: ${item.enrollmentDate}`}
+                  />
+                  <div>{item.progress}%</div>
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Col>
+      </Row>
+    </div>
   );
 };
 
-export default React.memo(StudentDashboard);
+export default StudentDashboard;

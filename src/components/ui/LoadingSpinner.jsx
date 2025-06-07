@@ -17,10 +17,8 @@ const LoadingSpinner = ({
   centered = true,
   backgroundBlur = false,
 }) => {
-  // Size validation and mapping
   const validatedSize = ['small', 'default', 'large'].includes(size) ? size : 'default';
-  
-  // Dynamic classes using classNames
+
   const spinnerClasses = classNames(
     {
       'custom-spinner': true,
@@ -47,22 +45,18 @@ const LoadingSpinner = ({
 
   const spinnerElement = (
     <Spin
-      size={validatedSize}
-      tip={tip}
-      delay={delay}
-      indicator={indicator}
-      className={spinnerClasses}
-      wrapperClassName={wrapperClasses}
-      style={{
-        '--spinner-color': spinnerColor,
-        '--text-color': textColor,
-      }}
-    />
+  size={validatedSize}
+  tip={tip}
+  delay={delay}
+  indicator={indicator}
+  className={spinnerClasses}
+/>
+
   );
 
   if (fullscreen) {
     return (
-      <div 
+      <div
         className={overlayClasses}
         style={{ backgroundColor: overlayColor }}
         role="status"
@@ -78,39 +72,18 @@ const LoadingSpinner = ({
 };
 
 LoadingSpinner.propTypes = {
-  /** Size of the spinner */
   size: PropTypes.oneOf(['small', 'default', 'large']),
-  /** Optional text displayed below the spinner */
   tip: PropTypes.string,
-  /** Delay in milliseconds before showing the spinner */
   delay: PropTypes.number,
-  /** Whether to display spinner as fullscreen overlay */
   fullscreen: PropTypes.bool,
-  /** Additional class name for the spinner */
   className: PropTypes.string,
-  /** Additional class name for the wrapper */
   wrapperClassName: PropTypes.string,
-  /** Custom indicator element to replace default spinner */
   indicator: PropTypes.node,
-  /** Color of the fullscreen overlay */
   overlayColor: PropTypes.string,
-  /** Custom color for the spinner */
   spinnerColor: PropTypes.string,
-  /** Custom color for the text */
   textColor: PropTypes.string,
-  /** Whether to center the spinner in its container */
   centered: PropTypes.bool,
-  /** Whether to add a blur effect to the background */
   backgroundBlur: PropTypes.bool,
-};
-
-LoadingSpinner.defaultProps = {
-  size: 'default',
-  delay: 0,
-  fullscreen: false,
-  centered: true,
-  backgroundBlur: false,
-  overlayColor: 'rgba(255, 255, 255, 0.75)',
 };
 
 export default LoadingSpinner;

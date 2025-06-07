@@ -5,10 +5,9 @@ import { toast } from 'react-toastify';
 import useAuth from "../../hooks/useAuth";
 import SocialLoginButtons from '../../components/auth/SocialLoginButtons';
 import AuthPageLayout from "../../components/layout/AuthPageLayout";
-import axios from '../../config/axios';
-import { loginUser } from '../../services/auth';
+
 const Login = () => {
-  const { login, loading, error, rememberedEmail } = useAuth();
+  const { login, loading: authLoading, rememberedEmail } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -67,62 +66,55 @@ const Login = () => {
     return !Object.values(errors).some(error => error);
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (!validateForm()) return;
-
-  setIsSubmitting(true);
-  
-  try {
-    const response = await loginUser({
-      email: formData.email,
-      password: formData.password,
-      rememberMe: rememberMe
-    });
-
-    console.log('Login Response:', response);
-
-    if (response?.Success) {
-      // تم نقل حفظ التوكن إلى AuthContext لضمان التزامن
-      // التوجيه إلى الصفحة المطلوبة
-      const redirectTo = location.state?.from?.pathname || '/dashboard';
-      navigate(redirectTo, { replace: true });
-      
-      toast.success(response.Message || 'تم تسجيل الدخول بنجاح');
-    } else {
-      throw new Error(response.Message || 'Login failed');
-    }
-  } catch (error) {
-    console.error("Login Error:", error);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    let errorMessage = error.message;
-    if (error.response) {
-      if (error.response.status === 401) {
-        errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
-      } else if (error.response.status === 403) {
-        errorMessage = 'الحساب غير مفعل، يرجى تأكيد البريد الإلكتروني';
-      } else if (error.response.status === 400) {
-        errorMessage = 'بيانات الدخول غير صالحة';
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    
+    try {
+      const result = await login({
+        email: formData.email,
+        password: formData.password
+      }, rememberMe);
+
+      if (result.success) {
+        // تم حفظ مسار التوجيه في ProtectedRoute، لذلك لا حاجة للتوجيه هنا
+        toast.success('تم تسجيل الدخول بنجاح');
+      } else {
+        throw new Error(result.error || 'فشل تسجيل الدخول');
       }
-    } else if (error.message.includes('network')) {
-      errorMessage = 'لا يمكن الاتصال بالخادم، يرجى التحقق من اتصالك بالإنترنت';
+    } catch (error) {
+      console.error("Login Error:", error);
+      
+      let errorMessage = error.message;
+      if (error.response) {
+        if (error.response.status === 401) {
+          errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+        } else if (error.response.status === 403) {
+          errorMessage = 'الحساب غير مفعل، يرجى تأكيد البريد الإلكتروني';
+        } else if (error.response.status === 400) {
+          errorMessage = 'بيانات الدخول غير صالحة';
+        }
+      } else if (error.message.includes('network')) {
+        errorMessage = 'لا يمكن الاتصال بالخادم، يرجى التحقق من اتصالك بالإنترنت';
+      }
+
+      toast.error(errorMessage, {
+        icon: <AlertCircle className="text-red-500" />
+      });
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    toast.error(errorMessage, {
-      icon: <AlertCircle className="text-red-500" />
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-
-useEffect(() => {
-  if (rememberedEmail) {
-    setFormData(prev => ({ ...prev, email: rememberedEmail }));
-    setRememberMe(true);
-  }
-}, [rememberedEmail]);
+  useEffect(() => {
+    if (rememberedEmail) {
+      setFormData(prev => ({ ...prev, email: rememberedEmail }));
+      setRememberMe(true);
+    }
+  }, [rememberedEmail]);
 
   return (
     <AuthPageLayout 
@@ -176,7 +168,7 @@ useEffect(() => {
               className={`block w-full pl-10 pr-3 py-3 border ${formErrors.email ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
               placeholder="you@example.com"
               autoComplete="username"
-              disabled={loading}
+              disabled={authLoading || isSubmitting}
             />
           </div>
           {formErrors.email && (
@@ -205,14 +197,14 @@ useEffect(() => {
               className={`block w-full pl-10 pr-10 py-3 border ${formErrors.password ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
               placeholder="••••••••"
               autoComplete="current-password"
-              disabled={loading}
+              disabled={authLoading || isSubmitting}
             />
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="text-gray-400 hover:text-gray-500 focus:outline-none"
-                disabled={loading}
+                disabled={authLoading || isSubmitting}
               >
                 {showPassword ? (
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -245,7 +237,7 @@ useEffect(() => {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              disabled={loading}
+              disabled={authLoading || isSubmitting}
             />
             <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
               تذكر بياناتي
@@ -256,7 +248,7 @@ useEffect(() => {
               type="button"
               onClick={() => navigate('/forgot-password', { state: { email: formData.email } })}
               className="font-medium text-blue-600 hover:text-blue-500"
-              disabled={loading}
+              disabled={authLoading || isSubmitting}
             >
               نسيت كلمة المرور؟
             </button>
@@ -267,12 +259,12 @@ useEffect(() => {
         <div>
           <button
             type="submit"
-            disabled={loading || isSubmitting}
+            disabled={authLoading || isSubmitting}
             className={`w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300 ${
-              (loading || isSubmitting) ? 'opacity-80 cursor-not-allowed' : ''
+              (authLoading || isSubmitting) ? 'opacity-80 cursor-not-allowed' : ''
             }`}
           >
-            {(loading || isSubmitting) ? (
+            {(authLoading || isSubmitting) ? (
               <>
                 <Loader2 className="animate-spin mr-2 h-5 w-5" />
                 جاري تسجيل الدخول...
