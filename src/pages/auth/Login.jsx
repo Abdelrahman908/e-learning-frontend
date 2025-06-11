@@ -120,34 +120,34 @@ const Login = () => {
     <AuthPageLayout 
       title="تسجيل الدخول إلى حسابك"
       subtitle="أدخل بريدك الإلكتروني وكلمة المرور للوصول إلى حسابك"
-      sideContent={
-        <>
-          <h1 className="text-4xl font-bold mb-4">مرحبًا بعودتك!</h1>
-          <p className="text-lg text-blue-100 leading-relaxed">
-            استمر في رحلتك التعليمية مع الوصول إلى آلاف الدورات التي يدرسها خبراء الصناعة.
-          </p>
+      // sideContent={
+      //   <>
+      //     <h1 className="text-4xl font-bold mb-4">مرحبًا بعودتك!</h1>
+      //     <p className="text-lg text-blue-100 leading-relaxed">
+      //       استمر في رحلتك التعليمية مع الوصول إلى آلاف الدورات التي يدرسها خبراء الصناعة.
+      //     </p>
           
-          <div className="mt-8 space-y-6">
-            <div className="flex items-center p-4 bg-white/10 backdrop-blur-sm rounded-xl">
-              <div className="flex-shrink-0 bg-blue-500 p-3 rounded-lg">
-                <ChevronRight className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <h3 className="font-medium">جديد في منصتنا؟</h3>
-                <p className="text-sm text-blue-100 mt-1">أنشئ حسابًا للبدء</p>
-              </div>
-            </div>
+      //     <div className="mt-8 space-y-6">
+      //       <div className="flex items-center p-4 bg-white/10 backdrop-blur-sm rounded-xl">
+      //         <div className="flex-shrink-0 bg-blue-500 p-3 rounded-lg">
+      //           <ChevronRight className="h-6 w-6 text-white" />
+      //         </div>
+      //         <div className="ml-4">
+      //           <h3 className="font-medium">جديد في منصتنا؟</h3>
+      //           <p className="text-sm text-blue-100 mt-1">أنشئ حسابًا للبدء</p>
+      //         </div>
+      //       </div>
             
-            <button 
-              onClick={() => navigate('/register')}
-              className="w-full flex items-center justify-center px-6 py-3 border border-white/30 rounded-xl text-base font-medium hover:bg-white hover:text-blue-600 transition-all duration-300 shadow-sm"
-            >
-              إنشاء حساب جديد
-              <ChevronRight className="ml-2 h-5 w-5" />
-            </button>
-          </div>
-        </>
-      }
+      //       <button 
+      //         onClick={() => navigate('/register')}
+      //         className="w-full flex items-center justify-center px-6 py-3 border border-white/30 rounded-xl text-base font-medium hover:bg-white hover:text-blue-600 transition-all duration-300 shadow-sm"
+      //       >
+      //         إنشاء حساب جديد
+      //         <ChevronRight className="ml-2 h-5 w-5" />
+      //       </button>
+      //     </div>
+      //   </>
+      // }
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Email */}

@@ -2,6 +2,7 @@ import axiosInstance from '../config/axios';
 import * as signalR from '@microsoft/signalr';
 
 let connection = null;
+let connectionPromise = null; // ✅ قفل المحاولة الحالية
 
 const extractErrorMessage = (error, fallback = 'حدث خطأ في الإشعارات') => {
   const data = error.response?.data;
@@ -50,9 +51,14 @@ const NotificationService = {
       return;
     }
 
-    if (connection) {
+    if (connection && connection.state === signalR.HubConnectionState.Connected) {
       console.log("🔔 SignalR connection already established.");
-      return; // لا داعي لإعادة الاتصال إذا كان هناك اتصال قائم
+      return;
+    }
+
+    if (connectionPromise) {
+      console.log("🔁 الاتصال بـ SignalR جارٍ باستخدام promise موجودة...");
+      return connectionPromise;
     }
 
     connection = new signalR.HubConnectionBuilder()
@@ -67,23 +73,38 @@ const NotificationService = {
       onReceive(notification);
     });
 
-    try {
-      await connection.start();
-      console.log('✅ SignalR connected');
-    } catch (error) {
-      console.error('❌ SignalR connection error:', error);
-    }
+    connectionPromise = connection.start()
+      .then(() => {
+        console.log('✅ SignalR connected');
+      })
+      .catch(error => {
+        console.error('❌ SignalR connection error during start:', error);
+        connection = null;
+        throw error;
+      })
+      .finally(() => {
+        connectionPromise = null; // ✅ تحرير promise مهما كانت النتيجة
+      });
+
+    return connectionPromise;
   },
 
   stopConnection: async () => {
     if (connection) {
-      await connection.stop();
-      connection = null;
-      console.log('⛔ SignalR connection stopped');
-    } else {
-      console.log("❌ No SignalR connection to stop");
+      try {
+        await connection.stop();
+        console.log('⛔ SignalR connection stopped');
+      } catch (error) {
+        console.error('❌ Error stopping SignalR connection:', error);
+      } finally {
+        connection = null;
+        connectionPromise = null;
+      }
     }
   }
 };
+  getConnectionState: () => {
+    return connection?.state;
+  }
 
 export default NotificationService;

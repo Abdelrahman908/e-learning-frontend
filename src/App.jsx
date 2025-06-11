@@ -1,11 +1,13 @@
 import React, { Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import ProtectedLoginRoute from "./components/common/ProtectedLoginRoute";
 import LoadingSpinner from "./components/ui/LoadingSpinner";
 import Layout from "./components/layout/Layout";
 import ErrorBoundary from "./utils/ErrorBoundary";
 import DashboardRouter from "./components/DashboardRouter";
+import { ChatProvider } from "./contexts/ChatContext";
+import ChatBotPage from "./pages/ChatBotPage";
 
 // Lazy loaded layout components
 const Navbar = React.lazy(() => import("./components/layout/Navbar"));
@@ -24,6 +26,9 @@ const ViewCoursePage = React.lazy(() => import("./pages/ViewCoursePage"));
 const CoursesPage = React.lazy(() => import("./pages/CoursesPage"));
 const NotAuthorized = React.lazy(() => import("./pages/NotAuthorized"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
+const ContactPage = React.lazy(() => import('./pages/ContactPage'));
+const AboutPage = React.lazy(() => import("./pages/AboutPage"));
+
 
 // Dashboards
 const AdminDashboard = React.lazy(() => import("./pages/admin/AdminDashboard"));
@@ -31,9 +36,13 @@ const InstructorDashboard = React.lazy(() => import("./pages/instructor/Instruct
 const StudentDashboard = React.lazy(() => import("./pages/student/StudentDashboard"));
 
 // Course management pages
+const AddCoursePage = React.lazy(() => import("./pages/AddCoursePage"));
 const EditCoursePage = React.lazy(() => import("./pages/EditCoursePage"));
 const PaymentPage = React.lazy(() => import("./pages/PaymentPage"));
 const ProfilePage = React.lazy(() => import("./pages/ProfilePage"));
+const MyProfilePage = React.lazy(() => import("./pages/MyProfilePage"));
+const MyCoursesPage = React.lazy(() => import("./pages/instructor/MyCoursesPage"));
+const CourseChatPage = React.lazy(() => import("./pages/CourseChatPage"));
 
 // Notifications
 const NotificationPage = React.lazy(() => import("./pages/NotificationPage"));
@@ -44,19 +53,35 @@ const CreateUserPage = React.lazy(() => import("./pages/admin/users/CreateUserPa
 const EditUserPage = React.lazy(() => import("./pages/admin/users/EditUserPage"));
 const UserDetailsPage = React.lazy(() => import("./pages/admin/UserDetailsPage"));
 
+// Category management
+const CategoriesPage = React.lazy(() => import("./pages/CategoriesPage"));
+const CreateCategoryPage = React.lazy(() => import("./pages/CreateCategoryPage"));
+
+// ** صفحات الدروس **
+const LessonsListPage = React.lazy(() => import("./pages/lessons/LessonsListPage"));
+const LessonDetailsPage = React.lazy(() => import("./pages/lessons/LessonDetailsPage"));
+const CreateLessonPage = React.lazy(() => import("./pages/lessons/CreateLessonPage"));
+const EditLessonPage = React.lazy(() => import("./pages/lessons/EditLessonPage"));
+
 const App = () => {
+  const location = useLocation();
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen flex flex-col bg-white text-gray-800">
         <Suspense fallback={<LoadingSpinner fullScreen />}>
           <Navbar />
-          <Hero />
+
+          {location.pathname === "/" && <Hero />}
 
           <main className="flex-grow py-6">
             <div className="container mx-auto px-4">
               <Routes>
                 {/* Public Routes */}
                 <Route path="/" element={<Home />} />
+                <Route path="/contact" element={<ContactPage />} />
+               <Route path="/about" element={<AboutPage />} />
+                <Route path="/chatbot" element={<ChatBotPage />} />
                 <Route
                   path="/login"
                   element={
@@ -86,13 +111,13 @@ const App = () => {
                 <Route path="/courses" element={<CoursesPage />} />
                 <Route path="/courses/:id" element={<ViewCoursePage />} />
 
-                {/* Protected Routes */}
+                {/* Protected Profile Routes */}
                 <Route
                   path="/profile"
                   element={
                     <ProtectedRoute>
                       <Layout>
-                        <ProfilePage />
+                        <MyProfilePage />
                       </Layout>
                     </ProtectedRoute>
                   }
@@ -108,11 +133,31 @@ const App = () => {
                   }
                 />
                 <Route
+                  path="/courses/new"
+                  element={
+                    <ProtectedRoute roles={["instructor", "admin"]}>
+                      <Layout>
+                        <AddCoursePage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/courses/edit/:id"
                   element={
                     <ProtectedRoute roles={["instructor", "admin"]} requireCourseOwnership>
                       <Layout>
                         <EditCoursePage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/dashboard/my-courses"
+                  element={
+                     <ProtectedRoute roles={["instructor"]}>
+                      <Layout>
+                        <MyCoursesPage />
                       </Layout>
                     </ProtectedRoute>
                   }
@@ -127,6 +172,21 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 />
+
+                <Route
+  path="/courses/:courseId/chat"
+  element={
+    <ProtectedRoute roles={["student", "instructor", "admin"]}>
+      <ChatProvider>
+        <Layout>
+          <CourseChatPage />
+        </Layout>
+      </ChatProvider>
+    </ProtectedRoute>
+  }
+/>
+
+
                 <Route
                   path="/notifications"
                   element={
@@ -137,6 +197,53 @@ const App = () => {
                     </ProtectedRoute>
                   }
                 />
+
+                {/* ===== صفحات الدروس ===== */}
+               {/* ===== صفحات الدروس ===== */}
+                  <Route
+                    path="/courses/:courseId/lessons"
+                    element={
+                      <ProtectedRoute roles={["student", "instructor", "admin"]}>
+                        <Layout>
+                          <LessonsListPage />
+                        </Layout>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/courses/:courseId/lessons/new"
+                    element={
+                      <ProtectedRoute roles={["instructor", "admin"]}>
+                        <Layout>
+                          <CreateLessonPage />
+                        </Layout>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/courses/:courseId/lessons/:id/edit"
+                    element={
+                      <ProtectedRoute roles={["instructor", "admin"]} requireLessonOwnership>
+                        <Layout>
+                          <EditLessonPage />
+                        </Layout>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/courses/:courseId/lessons/:id"
+                    element={
+                      <ProtectedRoute roles={["student", "instructor", "admin"]}>
+                        <Layout>
+                          <LessonDetailsPage />
+                        </Layout>
+                      </ProtectedRoute>
+                    }
+                  />
+                
 
                 {/* Admin Routes */}
                 <Route
@@ -162,7 +269,7 @@ const App = () => {
                 <Route
                   path="/admin/users/edit/:id"
                   element={
-                    <ProtectedRoute roles={["admin"]}>
+                    <ProtectedRoute >
                       <Layout>
                         <EditUserPage />
                       </Layout>
@@ -175,6 +282,26 @@ const App = () => {
                     <ProtectedRoute roles={["admin"]}>
                       <Layout>
                         <UserDetailsPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/categories"
+                  element={
+                    <ProtectedRoute roles={["admin"]}>
+                      <Layout>
+                        <CategoriesPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/categories/create"
+                  element={
+                    <ProtectedRoute roles={["admin"]}>
+                      <Layout>
+                        <CreateCategoryPage />
                       </Layout>
                     </ProtectedRoute>
                   }

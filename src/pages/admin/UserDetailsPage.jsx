@@ -28,7 +28,6 @@ const UserDetailsPage = () => {
   }, [id]);
 
   if (loading) return <LoadingSpinner fullScreen />;
-
   if (!user) return null;
 
   const getRoleStyle = (role) => {
@@ -73,18 +72,30 @@ const UserDetailsPage = () => {
           <h2 className="text-xl font-semibold text-gray-800">{user.fullName}</h2>
           <p className="text-sm text-gray-500 break-words mt-1">{user.email}</p>
           <span
-            className={`inline-block mt-3 text-xs px-3 py-1 rounded-full font-medium ${getRoleStyle(
-              user.role
-            )}`}
+            className={`inline-block mt-3 text-xs px-3 py-1 rounded-full font-medium ${getRoleStyle(user.role)}`}
           >
             {user.role}
           </span>
         </div>
 
-        {/* أي بيانات إضافية */}
-        <div className="mt-6 text-sm text-gray-600 space-y-1">
-          <p><strong>تاريخ الإنشاء:</strong> {new Date(user.createdAt).toLocaleDateString()}</p>
-          {/* أضف أي تفاصيل إضافية عند الحاجة */}
+        <div className="mt-6 text-sm text-gray-600 space-y-2">
+          <p>
+            <strong>تاريخ الإنشاء:</strong>{" "}
+            {user.createdAt
+              ? new Date(user.createdAt).toLocaleDateString("ar-EG", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })
+              : "غير متوفر"}
+          </p>
+          <p>
+            <strong>الحالة:</strong> {user.isActive ? "مفعل" : "معطل"}
+          </p>
+          <p>
+            <strong>تأكيد البريد:</strong>{" "}
+            {user.isEmailConfirmed ? "تم" : "لم يتم"}
+          </p>
         </div>
       </div>
     </div>

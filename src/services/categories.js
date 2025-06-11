@@ -6,14 +6,22 @@ const extractErrorMessage = (error, fallback = 'فشل في جلب التصني�
 };
 
 const CategoryService = {
-  getAll: async () => {
-    try {
-      const response = await axiosInstance.get('/Category');
-      return response.data;
-    } catch (error) {
-      throw new Error(extractErrorMessage(error));
-    }
-  },
+ getAll: async () => {
+  try {
+    const response = await axiosInstance.get('/Category');
+    const validCategories = (response.data || [])
+      .filter(cat => cat.Id != null)
+      .map(cat => ({
+        id: cat.Id,
+        name: cat.Name,
+      }));
+    return validCategories;
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
+},
+
+
 
   getById: async (id) => {
     try {

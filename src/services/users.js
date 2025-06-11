@@ -5,11 +5,22 @@ const extractErrorMessage = (error, fallback = 'حدث خطأ في المستخ�
   return data?.FailureReason || data?.Message || fallback;
 };
 
+const formatUser = (u) => ({
+  id: u.id ?? u.Id,
+  fullName: u.fullName ?? u.FullName ?? '',
+  email: u.email ?? u.Email ?? '',
+  role: u.role ?? u.Role ?? '',
+  createdAt: u.createdAt ?? u.CreatedAt ?? null,
+  isActive: u.isActive ?? u.IsActive ?? true,
+  isEmailConfirmed: u.isEmailConfirmed ?? u.IsEmailConfirmed ?? false,
+});
+
 const UserService = {
   getAll: async (filters = {}) => {
     try {
       const response = await axiosInstance.get('/User', { params: filters });
-      return response.data;
+      const users = Array.isArray(response.data) ? response.data : [];
+      return users.map(formatUser);
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'فشل في جلب المستخدمين'));
     }
@@ -18,25 +29,27 @@ const UserService = {
   getById: async (id) => {
     try {
       const response = await axiosInstance.get(`/User/${id}`);
-      return response.data;
+      return formatUser(response.data);
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'فشل في جلب المستخدم'));
     }
   },
 
-  create: async (user) => {
-    try {
-      const response = await axiosInstance.post('/User', user);
-      return response.data;
-    } catch (error) {
-      throw new Error(extractErrorMessage(error, 'فشل في إنشاء المستخدم'));
-    }
-  },
+ create: async (user) => {
+  try {
+    const res = await axiosInstance.post('/User', user);
+    return res.data;
+  } catch (error) {
+    console.error('API Error:', error.response?.data);
+    throw new Error(error.response?.data?.message || 'فشل في إنشاء المستخدم');
+  }
+}
+,
 
   update: async (id, updates) => {
     try {
       const response = await axiosInstance.put(`/User/${id}`, updates);
-      return response.data;
+      return response.data; // عملية التحديث لا تُرجع كائن المستخدم غالبًا
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'فشل في تحديث المستخدم'));
     }

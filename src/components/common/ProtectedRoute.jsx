@@ -16,20 +16,24 @@ const ProtectedRoute = ({
   const params = useParams();
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const { currentCourse, loading: courseLoading, fetchCourseById } = useCourses();
-  
+
   const [isChecking, setIsChecking] = useState(true);
-  const courseId = params.id || params.courseId || new URLSearchParams(location.search).get('courseId');
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [redirect, setRedirect] = useState(null);
+
+  const courseId =
+    params.id || params.courseId || new URLSearchParams(location.search).get('courseId');
 
   useEffect(() => {
     const verifyAccess = async () => {
       try {
-        // 1. إذا كان مطلوب جلب بيانات الدورة
         if (requireCourseOwnership && courseId && !currentCourse) {
           await fetchCourseById(courseId);
         }
       } catch (error) {
         console.error('فشل في التحقق من الوصول:', error);
-        toast.error('حدث خطأ أثناء التحقق من الصلاحيات');
+        setErrorMessage('حدث خطأ أثناء التحقق من الصلاحيات');
+        setRedirect('/not-authorized');
       } finally {
         setIsChecking(false);
       }
@@ -38,39 +42,49 @@ const ProtectedRoute = ({
     verifyAccess();
   }, [requireCourseOwnership, courseId, currentCourse, fetchCourseById]);
 
-  // 1. عرض التحميل أثناء الجلب الأولي للبيانات
-  if (authLoading || isChecking) {
+  useEffect(() => {
+    if (errorMessage) {
+      toast.error(errorMessage);
+      setErrorMessage(null);
+    }
+  }, [errorMessage]);
+
+  if (authLoading || isChecking || courseLoading) {
     return <LoadingSpinner fullScreen />;
   }
 
-  // 2. التحقق من المصادقة
+  if (redirect) {
+    return <Navigate to={redirect} state={{ from: location }} replace />;
+  }
+
   if (!isAuthenticated) {
     localStorage.setItem('redirectPath', location.pathname + location.search);
     return <Navigate to={redirectPath} state={{ from: location }} replace />;
   }
 
-  // 3. التحقق من الصلاحيات
+  // ✅ مقارنة مرنة غير حساسة لحالة الأحرف
   const userRole = user?.role?.toLowerCase();
-  if (roles.length > 0 && !roles.includes(userRole)) {
-    toast.error('ليس لديك صلاحية الوصول إلى هذه الصفحة');
-    return <Navigate to="/not-authorized" state={{ from: location }} replace />;
+  const allowedRoles = roles.map(r => r.toLowerCase());
+
+  if (roles.length > 0 && !allowedRoles.includes(userRole)) {
+    setErrorMessage('ليس لديك صلاحية الوصول إلى هذه الصفحة');
+    setRedirect('/not-authorized');
+    return null;
   }
 
-  // 4. التحقق من ملكية الدورة
   if (requireCourseOwnership) {
     if (!courseId) {
-      toast.error('لم يتم تحديد دورة');
-      return <Navigate to="/courses" replace />;
+      setErrorMessage('لم يتم تحديد دورة');
+      setRedirect('/courses');
+      return null;
     }
 
-    if (courseLoading) {
-      return <LoadingSpinner fullScreen />;
-    }
+    if (String(currentCourse?.instructorId) !== String(user.id)) {
+  setErrorMessage('ليس لديك صلاحية التعديل على هذه الدورة');
+  setRedirect('/not-authorized');
+  return null;
+}
 
-    if (currentCourse?.instructorId !== user.id) {
-      toast.error('ليس لديك صلاحية التعديل على هذه الدورة');
-      return <Navigate to="/not-authorized" state={{ from: location }} replace />;
-    }
   }
 
   return children;

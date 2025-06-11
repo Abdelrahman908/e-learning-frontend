@@ -75,12 +75,13 @@ export const AuthProvider = ({ children }) => {
 
     if (user) {
       // استخدام الحروف الصغيرة لخصائص المستخدم
-      const formattedUser = {
+            const formattedUser = {
         id: user.id || user.Id,
         email: user.email || user.Email,
         fullName: user.fullName || user.FullName,
-        role: user.role || user.Role
+        role: (user.role || user.Role)?.toLowerCase() // ✅ تحويل إلى lowercase
       };
+
       
       localStorage.setItem('user', JSON.stringify(formattedUser));
       authUpdates.user = formattedUser;
@@ -529,9 +530,9 @@ const resetPassword = useCallback(async (email, code, newPassword) => {
   }, [authState.token, logout, updateAuthState]);
 
   // دوال التحقق من نوع المستخدم
-  const isInstructor = () => authState.user?.role === 'Instructor';
-  const isStudent = () => authState.user?.role === 'Student';
-  const isAdmin = () => authState.user?.role === 'Admin';
+ const isInstructor = () => authState.user?.role === 'instructor';
+const isStudent = () => authState.user?.role === 'student';
+const isAdmin = () => authState.user?.role === 'admin';
 
   // سياق المصادقة
   const contextValue = useMemo(() => ({

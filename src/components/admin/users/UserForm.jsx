@@ -29,13 +29,13 @@ const UserForm = ({ id }) => {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const data = await UserService.getById(id);
-        setForm({
-          fullName: data.fullName,
-          email: data.email,
-          role: data.role,
-          password: '', // لا نظهر كلمة المرور
-        });
+        const data = await UserService.create({
+  FullName: form.fullName,
+  Email: form.email,
+  Password: form.password,
+  Role: form.role,
+});
+
       } catch (err) {
         toast.error(err.message || 'فشل في تحميل بيانات المستخدم');
       } finally {

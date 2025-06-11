@@ -150,36 +150,36 @@ const Register = () => {
     <AuthPageLayout 
       title="إنشاء حساب جديد"
       subtitle="املأ النموذج أدناه لإنشاء حسابك"
-      sideContent={
-        <>
-          <h1 className="text-4xl font-bold mb-4">انضم إلينا اليوم!</h1>
-          <p className="text-lg text-blue-100 leading-relaxed">
-            احصل على وصول إلى آلاف الدورات وانضم إلى مجتمع من المتعلمين والمعلمين المتحمسين.
-          </p>
+      // sideContent={
+      //   <>
+      //     <h1 className="text-4xl font-bold mb-4">انضم إلينا اليوم!</h1>
+      //     <p className="text-lg text-blue-100 leading-relaxed">
+      //       احصل على وصول إلى آلاف الدورات وانضم إلى مجتمع من المتعلمين والمعلمين المتحمسين.
+      //     </p>
           
-          <div className="mt-8 space-y-6">
-            <div className="flex items-center p-4 bg-white/10 backdrop-blur-sm rounded-xl">
-              <div className="flex-shrink-0 bg-blue-500 p-3 rounded-lg">
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-              </div>
-              <div className="ml-4">
-                <h3 className="font-medium">لديك حساب بالفعل؟</h3>
-                <p className="text-sm text-blue-100 mt-1">سجل الدخول للوصول إلى حسابك</p>
-              </div>
-            </div>
+      //     <div className="mt-8 space-y-6">
+      //       <div className="flex items-center p-4 bg-white/10 backdrop-blur-sm rounded-xl">
+      //         <div className="flex-shrink-0 bg-blue-500 p-3 rounded-lg">
+      //           <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      //             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+      //           </svg>
+      //         </div>
+      //         <div className="ml-4">
+      //           <h3 className="font-medium">لديك حساب بالفعل؟</h3>
+      //           <p className="text-sm text-blue-100 mt-1">سجل الدخول للوصول إلى حسابك</p>
+      //         </div>
+      //       </div>
             
-            <button 
-              onClick={() => navigate('/login', { state: location.state })}
-              className="w-full flex items-center justify-center px-6 py-3 border border-white/30 rounded-xl text-base font-medium hover:bg-white hover:text-blue-600 transition-all duration-300 shadow-sm"
-            >
-              تسجيل الدخول
-              <ChevronRight className="ml-2 h-5 w-5" />
-            </button>
-          </div>
-        </>
-      }
+      //       <button 
+      //         onClick={() => navigate('/login', { state: location.state })}
+      //         className="w-full flex items-center justify-center px-6 py-3 border border-white/30 rounded-xl text-base font-medium hover:bg-white hover:text-blue-600 transition-all duration-300 shadow-sm"
+      //       >
+      //         تسجيل الدخول
+      //         <ChevronRight className="ml-2 h-5 w-5" />
+      //       </button>
+      //     </div>
+      //   </>
+      // }
     >
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* الاسم الكامل */}

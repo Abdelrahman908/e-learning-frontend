@@ -1,25 +1,46 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Bell, Trash2, Mail, AlertTriangle, DollarSign } from 'lucide-react';
-import { Table, Tag, Spin, Alert, Button, message, Input, Select, Popconfirm } from 'antd';
+import { Bell, Trash2, Mail, AlertTriangle, DollarSign, CheckCircle, XCircle, Filter } from 'lucide-react';
+import { Table, Tag, Spin, Alert, Button, message, Input, Select, Popconfirm, Tooltip, Badge } from 'antd';
 import NotificationService from '../services/notifications';
 import useAuth from '../hooks/useAuth';
 
 const { Search } = Input;
 const { Option } = Select;
 
+const sampleNotifications = [
+  {
+    id: 1,
+    type: 'message',
+    title: 'رسالة جديدة من الدعم',
+    message: 'يرجى مراجعة استفسارك في قسم الدعم.',
+    isRead: false,
+    createdAt: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+  },
+  {
+    id: 2,
+    type: 'alert',
+    title: 'تنبيه أمني',
+    message: 'تم تسجيل دخول من جهاز جديد.',
+    isRead: true,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+  },
+];
+
 const NotificationPage = () => {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState(sampleNotifications);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchText, setSearchText] = useState("");
 
   useEffect(() => {
+    if (!user) return;
+    setLoading(true);
     const fetchData = async () => {
       try {
         const data = await NotificationService.getMyNotifications();
-        setNotifications(data.Notifications || []);
+        setNotifications(data.Notifications || sampleNotifications);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -27,7 +48,7 @@ const NotificationPage = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -66,6 +87,7 @@ const NotificationPage = () => {
       setNotifications(prev =>
         prev.map(n => n.id === id ? { ...n, isRead } : n)
       );
+      message.success(isRead ? 'تم تمييز الإشعار كمقروء' : 'تم تمييز الإشعار كغير مقروء');
     } catch (err) {
       message.error('فشل تحديث الحالة');
     }
@@ -75,6 +97,7 @@ const NotificationPage = () => {
     try {
       await NotificationService.deleteNotification(id);
       setNotifications(prev => prev.filter(n => n.id !== id));
+      message.success('تم حذف الإشعار');
     } catch (err) {
       message.error('فشل حذف الإشعار');
     }
@@ -117,15 +140,16 @@ const NotificationPage = () => {
   }, [notifications, filterStatus, searchText]);
 
   const getIcon = (type) => {
+    const baseClass = "inline-block mr-1 align-middle";
     switch (type) {
       case 'message':
-        return <Mail className="text-blue-500" />;
+        return <Mail className={`${baseClass} text-blue-600`} size={20} />;
       case 'alert':
-        return <AlertTriangle className="text-yellow-500" />;
+        return <AlertTriangle className={`${baseClass} text-yellow-600`} size={20} />;
       case 'payment':
-        return <DollarSign className="text-green-500" />;
+        return <DollarSign className={`${baseClass} text-green-600`} size={20} />;
       default:
-        return <Bell className="text-gray-500" />;
+        return <Bell className={`${baseClass} text-gray-400`} size={20} />;
     }
   };
 
@@ -133,74 +157,166 @@ const NotificationPage = () => {
     {
       title: 'نوع',
       dataIndex: 'type',
-      render: (val) => getIcon(val)
+      width: 80,
+      render: (val) => (
+        <Tooltip title={`نوع الإشعار: ${val}`}>
+          {getIcon(val)}
+        </Tooltip>
+      )
     },
     {
       title: 'العنوان',
       dataIndex: 'title',
+      ellipsis: true,
+      render: (text, record) => (
+        <div style={{ fontWeight: record.isRead ? '400' : '700', color: record.isRead ? '#555' : '#222' }}>{text}</div>
+      )
     },
     {
       title: 'الرسالة',
       dataIndex: 'message',
+      ellipsis: true,
+      render: (text, record) => (
+        <div style={{ fontWeight: record.isRead ? '400' : '700', color: record.isRead ? '#555' : '#222' }}>{text}</div>
+      )
     },
     {
       title: 'الحالة',
       dataIndex: 'isRead',
-      render: (val) => val ? <Tag color="green">مقروء</Tag> : <Tag color="orange">غير مقروء</Tag>
+      width: 100,
+      filters: [
+        { text: 'مقروء', value: true },
+        { text: 'غير مقروء', value: false }
+      ],
+      onFilter: (value, record) => record.isRead === value,
+      render: (val) =>
+        val
+          ? <Tag color="green" icon={<CheckCircle />}>مقروء</Tag>
+          : <Tag color="orange" icon={<XCircle />}>غير مقروء</Tag>
     },
     {
       title: 'التاريخ',
       dataIndex: 'createdAt',
+      width: 180,
+      sorter: (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
       render: val => new Date(val).toLocaleString()
     },
     {
       title: 'الخيارات',
+      width: 140,
+      fixed: 'right',
       render: (_, record) => (
         <div className="flex gap-2">
-          <Button size="small" onClick={() => handleMarkAsRead(record.id, !record.isRead)}>
-            {record.isRead ? 'كغير مقروء' : 'كمقروء'}
-          </Button>
-          <Button size="small" danger icon={<Trash2 />} onClick={() => handleDelete(record.id)} />
+          <Tooltip title={record.isRead ? "اجعلها غير مقروءة" : "اجعلها مقروءة"}>
+            <Button
+              size="small"
+              type={record.isRead ? "default" : "primary"}
+              onClick={() => handleMarkAsRead(record.id, !record.isRead)}
+              style={{ minWidth: 80, borderRadius: 8, boxShadow: '0 1px 3px rgb(0 0 0 / 0.1)' }}
+            >
+              {record.isRead ? 'غير مقروء' : 'مقروء'}
+            </Button>
+          </Tooltip>
+          <Tooltip title="حذف الإشعار">
+            <Button
+              size="small"
+              danger
+              icon={<Trash2 size={16} />}
+              onClick={() => handleDelete(record.id)}
+              style={{ borderRadius: 8 }}
+            />
+          </Tooltip>
         </div>
       )
     }
   ];
 
-  if (loading) return <Spin className="mt-10 block mx-auto" />;
+  if (loading) return <Spin className="mt-10 block mx-auto" size="large" />;
   if (error) return <Alert message={error} type="error" className="m-4" />;
 
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
   return (
-    <div className="max-w-6xl mx-auto mt-6 p-4">
-      <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-        <Bell /> الإشعارات
+    <div className="max-w-6xl mx-auto mt-8 p-8 bg-white rounded-xl shadow-2xl">
+      <h2 className="text-3xl font-extrabold mb-6 flex items-center gap-3 text-black select-none">
+        <Badge count={unreadCount} offset={[6, -10]} color="#000" size="default">
+          <Button
+            type="text"
+            className="p-0"
+            style={{
+              color: '#000',
+              fontWeight: '900',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'default',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              borderRadius: '50%',
+              width: 48,
+              height: 48,
+              backgroundColor: '#fff',
+              border: '2px solid #000',
+              transition: 'all 0.3s ease',
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#000'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#fff'}
+          >
+            <Bell size={28} />
+          </Button>
+        </Badge>
+        الإشعارات
       </h2>
 
-      <div className="flex flex-wrap gap-4 mb-4">
+      <div className="flex flex-wrap items-center gap-5 mb-6">
         <Search
           placeholder="بحث في العنوان أو الرسالة"
           onChange={e => setSearchText(e.target.value)}
           allowClear
-          className="w-64"
+          className="w-72"
+          enterButton
+          size="large"
+          style={{ borderRadius: 10, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}
         />
         <Select
+          suffixIcon={<Filter size={16} />}
           value={filterStatus}
           onChange={val => setFilterStatus(val)}
-          className="w-40"
+          className="w-44"
+          dropdownMatchSelectWidth={false}
+          size="large"
+          style={{ borderRadius: 10, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}
         >
           <Option value="all">الكل</Option>
           <Option value="read">المقروءة فقط</Option>
           <Option value="unread">الغير مقروءة</Option>
         </Select>
-        <Button onClick={markAllAsRead} disabled={!notifications.some(n => !n.isRead)}>
-          تمييز الكل كمقروء
-        </Button>
+        <Tooltip title="تمييز جميع الإشعارات كمقروءة">
+          <Button
+            onClick={markAllAsRead}
+            disabled={!notifications.some(n => !n.isRead)}
+            type="primary"
+            ghost
+            size="large"
+            style={{ borderRadius: 10, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}
+          >
+            تمييز الكل كمقروء
+          </Button>
+        </Tooltip>
         <Popconfirm
           title="هل أنت متأكد من حذف جميع الإشعارات؟"
           onConfirm={deleteAll}
           okText="نعم"
           cancelText="لا"
         >
-          <Button danger>حذف الكل</Button>
+          <Tooltip title="حذف جميع الإشعارات">
+            <Button
+              danger
+              size="large"
+              style={{ borderRadius: 10, boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}
+            >
+              حذف الكل
+            </Button>
+          </Tooltip>
         </Popconfirm>
       </div>
 
@@ -208,7 +324,16 @@ const NotificationPage = () => {
         dataSource={filteredNotifications}
         columns={columns}
         rowKey="id"
-        pagination={{ pageSize: 6 }}
+        pagination={{ pageSize: 6, showSizeChanger: true, pageSizeOptions: ['6', '12', '24'] }}
+        scroll={{ x: 1000 }}
+        rowClassName={(record) =>
+          !record.isRead ? 'bg-blue-50 font-semibold' : ''
+        }
+        style={{ borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+        onRow={(record) => ({
+          onMouseEnter: e => e.currentTarget.style.backgroundColor = '#d0eaff',
+          onMouseLeave: e => e.currentTarget.style.backgroundColor = record.isRead ? '' : '#e6f7ff'
+        })}
       />
     </div>
   );

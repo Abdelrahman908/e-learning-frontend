@@ -79,7 +79,7 @@ const UserCard = ({ user, onDelete }) => {
             {user.role}
           </span>
 
-          {isAdmin && (
+          {  (
             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
               <Link to={`/admin/users/edit/${user.id}`}>
                 <button

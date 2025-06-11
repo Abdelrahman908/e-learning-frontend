@@ -6,10 +6,9 @@ import {
   Button,
   Space,
   Tag,
-  Divider,
+  Descriptions,
   Spin,
   Alert,
-  Descriptions,
   Modal
 } from 'antd';
 import useAuth from '../../hooks/useAuth';
@@ -25,7 +24,7 @@ const CourseDetails = () => {
   const [enrollmentStatus, setEnrollmentStatus] = useState(false);
   const [checkingEnrollment, setCheckingEnrollment] = useState(true);
 
-  const { isInstructor, user, token } = useAuth();
+  const { isInstructor, user, token, isAdmin } = useAuth();
 
   useEffect(() => {
     const fetchCourseData = async () => {
@@ -46,14 +45,15 @@ const CourseDetails = () => {
   useEffect(() => {
     if (!token) {
       setCheckingEnrollment(false);
+      setEnrollmentStatus(false);
       return;
     }
 
     const fetchEnrollment = async () => {
       try {
         setCheckingEnrollment(true);
-        const enrollmentData = await CourseService.isEnrolled(id);
-        setEnrollmentStatus(enrollmentData.isEnrolled);
+        const isEnrolled = await CourseService.isEnrolled(id);
+        setEnrollmentStatus(isEnrolled);
       } catch (err) {
         console.warn('فشل التحقق من التسجيل:', err);
         setEnrollmentStatus(false);
@@ -87,18 +87,19 @@ const CourseDetails = () => {
     }
   };
 
-  if (loading) return <Spin size="large" className="flex justify-center mt-8" />;
+  if (loading) return <Spin size="large" className="flex justify-center mt-12" />;
   if (error) return <Alert message={error} type="error" showIcon className="m-4" />;
   if (!course) return <Alert message="الكورس غير موجود" type="error" showIcon className="m-4" />;
 
   const canEdit = isInstructor() &&
     (user?.sub === course.instructorId || user?.userId === course.instructorId);
 
+  const canChat = enrollmentStatus || canEdit || isAdmin?.();
+
   const formattedDate = course.createdAt && dayjs(course.createdAt).isValid()
     ? dayjs(course.createdAt).format('YYYY-MM-DD')
     : 'تاريخ غير معروف';
 
-  // ✅ تأكد أن VITE_API_BASE_URL تنتهي بـ /
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const fullBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
 
@@ -108,29 +109,55 @@ const CourseDetails = () => {
       : `${fullBaseUrl}${course.imageUrl.startsWith('/') ? course.imageUrl.slice(1) : course.imageUrl}`)
     : '/default-course.jpg';
 
+  const handleChatClick = () => {
+    navigate(`/courses/${course.id}/chat`);
+  };
+
   return (
-    <div className="course-details p-4 max-w-6xl mx-auto">
+    <div className="course-details p-6 max-w-7xl mx-auto">
       <Card
-        title={<h1 className="text-2xl font-bold">{course.name}</h1>}
-        cover={
-          <img
-            alt={course.name}
-            src={imageSrc}
-            className="w-full h-64 object-cover"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = '/default-course.jpg';
-              e.target.className = 'w-full h-64 object-contain bg-gray-100 p-4';
-            }}
-          />
+        bordered={false}
+        className="rounded-3xl shadow-lg overflow-hidden"
+        title={
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+            {course.name}
+          </h1>
         }
-        className="shadow-md"
+        cover={
+          <div className="relative h-72 md:h-96 overflow-hidden rounded-t-3xl shadow-inner">
+            <img
+              alt={course.name}
+              src={imageSrc}
+              className="w-full h-full object-cover transition-transform duration-500 ease-in-out hover:scale-105"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = '/default-course.jpg';
+                e.target.className = 'w-full h-full object-contain bg-gray-100 p-6';
+              }}
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4 md:p-8">
+              <Tag
+                color={course.isActive ? 'green' : 'red'}
+                className="text-lg font-semibold"
+              >
+                {course.isActive ? 'مفعلة' : 'غير مفعلة'}
+              </Tag>
+            </div>
+          </div>
+        }
       >
-        <div className="flex flex-col md:flex-row gap-6">
-          <div className="flex-1">
-            <Descriptions bordered column={1} size="middle">
+        <div className="flex flex-col md:flex-row gap-10">
+          {/* الوصف والتفاصيل */}
+          <div className="flex-1 bg-white p-6 rounded-2xl shadow-inner">
+            <Descriptions
+              bordered
+              column={1}
+              size="middle"
+              labelStyle={{ fontWeight: '600', color: '#374151' }}
+              contentStyle={{ color: '#4B5563', fontSize: '1rem' }}
+            >
               <Descriptions.Item label="الوصف">
-                {course.description || 'لا يوجد وصف'}
+                <p className="whitespace-pre-line">{course.description || 'لا يوجد وصف'}</p>
               </Descriptions.Item>
               <Descriptions.Item label="التصنيف">
                 {course.categoryName || 'غير محدد'}
@@ -144,68 +171,71 @@ const CourseDetails = () => {
             </Descriptions>
           </div>
 
-          <div className="md:w-80 flex flex-col gap-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">حالة الدورة</h3>
-              <Tag color={course.isActive ? 'green' : 'red'} className="text-lg">
-                {course.isActive ? 'مفعلة' : 'غير مفعلة'}
-              </Tag>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">السعر</h3>
-              <p className="text-2xl font-bold text-blue-600">
+          {/* الجهة اليمنى - السعر، التسجيل، أزرار */}
+          <div className="md:w-96 flex flex-col gap-6">
+            <div className="bg-blue-50 p-5 rounded-xl shadow-md flex flex-col items-center text-center">
+              <h3 className="text-lg font-semibold text-blue-700 mb-2">السعر</h3>
+              <p className="text-4xl font-extrabold text-blue-600">
                 {course.price > 0 ? `$${course.price}` : 'مجاني'}
               </p>
             </div>
 
-            <div className="mt-auto">
-              <Space direction="vertical" className="w-full">
-                {canEdit ? (
-                  <Link to={`/courses/edit/${course.id}`} className="w-full">
-                    <Button type="primary" block size="large">
-                      تعديل الدورة
-                    </Button>
-                  </Link>
-                ) : enrollmentStatus ? (
-                  <Link to={`/learn/${course.id}`} className="w-full">
-                    <Button type="primary" block size="large">
-                      استمر في التعلم
-                    </Button>
-                  </Link>
-                ) : (
-                 <button
-  onClick={handleEnroll}
-  disabled={checkingEnrollment || !course.isActive}
-  className={`
-    w-full py-3 rounded-xl text-white text-lg font-semibold transition
-    ${!course.isActive
-      ? 'bg-gray-400 cursor-not-allowed'
-      : checkingEnrollment
-      ? 'bg-blue-400 cursor-wait'
-      : 'bg-blue-600 hover:bg-blue-700'}
-  `}
->
-  {checkingEnrollment
-    ? 'جاري التحقق...'
-    : course.isFree
-    ? 'سجل الآن'
-    : 'إدفع وسجل'}
-</button>
-
-                )}
-
-                <Link to="/courses" className="w-full">
+            <Space direction="vertical" className="w-full">
+              {canEdit ? (
+                <Link to={`/courses/edit/${course.id}`} className="w-full">
                   <Button
+                    type="primary"
                     block
                     size="large"
-                    className="bg-gray-100 hover:bg-gray-200 text-black"
+                    className="rounded-xl font-bold shadow-lg hover:shadow-xl"
                   >
-                    العودة للقائمة
+                    تعديل الدورة
                   </Button>
                 </Link>
-              </Space>
-            </div>
+              ) : (
+                <button
+                  onClick={handleEnroll}
+                  disabled={checkingEnrollment || !course.isActive}
+                  className={`
+                    w-full py-4 rounded-xl text-white text-lg font-extrabold transition-all duration-300
+                    ${!course.isActive
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : checkingEnrollment
+                        ? 'bg-blue-400 cursor-wait'
+                        : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600'}
+                  `}
+                >
+                  {checkingEnrollment
+                    ? 'جاري التحقق...'
+                    : course.isFree
+                      ? 'سجل الآن'
+                      : 'إدفع وسجل'}
+                </button>
+              )}
+
+              {canChat && (
+                <Button
+                  type="default"
+                  block
+                  size="large"
+                  onClick={handleChatClick}
+                  className="mt-4 rounded-xl font-semibold border-blue-600 text-blue-700 hover:bg-blue-50 flex items-center justify-center gap-2"
+                  icon={<span style={{ fontSize: '22px' }}>💬</span>}
+                >
+                  دردشة الدورة
+                </Button>
+              )}
+
+              <Link to="/courses" className="w-full">
+                <Button
+                  block
+                  size="large"
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-xl font-semibold shadow-sm"
+                >
+                  العودة للقائمة
+                </Button>
+              </Link>
+            </Space>
           </div>
         </div>
       </Card>

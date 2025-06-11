@@ -1,19 +1,21 @@
 import React from "react";
 import CourseList from "../components/course/CourseList";
-import Header from "../components/layout/Header"; // أو AppHeader إذا غيّرت الاسم
+import Header from "../components/layout/Header";
 
 const CoursesPage = () => {
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-r from-blue-50 via-white to-blue-50">
       <Header />
 
-      <main className="p-6 max-w-6xl mx-auto">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h1 className="text-2xl font-bold mb-6 text-gray-800">
+      <main className="p-8 max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+          <h1 className="text-4xl font-extrabold mb-8 text-gray-900 tracking-tight select-none">
             جميع الكورسات
           </h1>
 
-          <CourseList />
+          <div className="border-t border-gray-200 pt-6">
+            <CourseList />
+          </div>
         </div>
       </main>
     </div>

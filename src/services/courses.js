@@ -1,5 +1,6 @@
 import axiosInstance from '../config/axios';
 
+// تنسيق بيانات الدورة لتوحيد الحقول
 const normalizeCourseData = (course) => ({
   id: course.Id || course.id,
   name: course.Name || course.name,
@@ -17,12 +18,14 @@ const normalizeCourseData = (course) => ({
   averageRating: course.AverageRating || course.averageRating,
 });
 
+// استخلاص رسالة الخطأ من الاستجابة
 const extractErrorMessage = (error, fallbackMessage) => {
   const data = error.response?.data;
   return data?.FailureReason || data?.Message || data?.message || fallbackMessage;
 };
 
 const CourseService = {
+  // جلب جميع الدورات مع الفلاتر
   getAllCourses: async (filters = {}) => {
     const params = {
       pageNumber: filters.page || 1,
@@ -45,6 +48,7 @@ const CourseService = {
     }
   },
 
+  // جلب دورة حسب المعرّف
   getCourseById: async (id) => {
     try {
       const response = await axiosInstance.get(`/Course/${id}`);
@@ -54,23 +58,20 @@ const CourseService = {
     }
   },
 
+  // جلب دورات المدرّس
   getInstructorCourses: async (instructorId, filters = {}) => {
     try {
-      const response = await axiosInstance.get(`/Course/instructor/${instructorId}`, { params: filters });
-      return response.data;
+      const response = await axiosInstance.get(`/Course/instructor/${instructorId}`, {
+        params: filters,
+      });
+      return response.data.map(normalizeCourseData);
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'فشل في جلب دورات المدرّس'));
     }
   },
 
-  createCourse: async (courseData) => {
-    const formData = new FormData();
-    Object.keys(courseData).forEach(key => {
-      if (courseData[key] !== undefined && courseData[key] !== null) {
-        formData.append(key, courseData[key]);
-      }
-    });
-
+  // إنشاء دورة جديدة (يدعم رفع صورة)
+  createCourse: async (formData) => {
     try {
       const response = await axiosInstance.post('/Course', formData, {
         headers: {
@@ -79,27 +80,37 @@ const CourseService = {
       });
       return response.data;
     } catch (error) {
+      console.error('Create Course Error:', error.response?.data || error.message);
       throw new Error(extractErrorMessage(error, 'فشل في إنشاء الدورة'));
     }
   },
 
+  // تعديل دورة (بما في ذلك صورة إن وُجدت)
   updateCourse: async (id, courseData) => {
+    const formData = new FormData();
+
+    Object.keys(courseData).forEach(key => {
+      const value = courseData[key];
+      if (value !== undefined && value !== null) {
+        if (key === "image" && value.originFileObj) {
+          formData.append("ImageFile", value.originFileObj); // اسم الملف في DTO
+        } else {
+          formData.append(key, value);
+        }
+      }
+    });
+
     try {
-      const response = await axiosInstance.put(`/Course/${id}`, courseData);
+      const response = await axiosInstance.put(`/Course/${id}`, formData);
       return response.data;
     } catch (error) {
+      console.error('Update Course Error:', error.response?.data || error.message);
       throw new Error(extractErrorMessage(error, 'فشل في تحديث الدورة'));
     }
   },
 
-  updateCourseWithImage: async (id, courseData) => {
-    const formData = new FormData();
-    Object.keys(courseData).forEach(key => {
-      if (courseData[key] !== undefined && courseData[key] !== null) {
-        formData.append(key, courseData[key]);
-      }
-    });
-
+  // تعديل دورة مع صورة (بديل عند استخدام endpoint مخصص)
+  updateCourseWithImage: async (id, formData) => {
     try {
       const response = await axiosInstance.put(`/Course/update-with-image/${id}`, formData, {
         headers: {
@@ -108,10 +119,22 @@ const CourseService = {
       });
       return response.data;
     } catch (error) {
-      throw new Error(extractErrorMessage(error, 'فشل في تحديث الدورة مع الصورة'));
+      throw new Error(extractErrorMessage(error, 'فشل في تحديث الدورة مع صورة'));
     }
   },
 
+  // التحقق مما إذا كان المستخدم مسجل في دورة
+  isEnrolled: async (courseId) => {
+    try {
+      const response = await axiosInstance.get(`/Enrollment/is-enrolled/${courseId}`);
+      return response.data; // true أو false
+    } catch (error) {
+      console.error('Enrollment Check Error:', error.response?.data || error.message);
+      throw new Error(extractErrorMessage(error, 'فشل في التحقق من حالة التسجيل'));
+    }
+  },
+
+  // حذف دورة
   deleteCourse: async (id) => {
     try {
       await axiosInstance.delete(`/Course/${id}`);

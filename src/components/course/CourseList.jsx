@@ -1,11 +1,11 @@
-// src/components/course/CourseList.jsx
-
 import { useState, useEffect, useCallback } from 'react';
 import CourseService from '../../services/courses';
 import CourseCard from './CourseCard';
 import useAuth from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { debounce } from 'lodash';
+
+const ratings = [4, 4.5, 5, 4.2, 4.8]; // قيم ريتينج ثابتة حسب طلبك
 
 const CourseList = () => {
   const [courses, setCourses] = useState([]);
@@ -32,7 +32,7 @@ const CourseList = () => {
       setError(null);
     } catch (err) {
       console.error('Error fetching courses:', err);
-      setError(err.message || 'Failed to load courses.');
+      setError(err.message || 'فشل في تحميل الكورسات.');
       setCourses([]);
     } finally {
       setLoading(false);
@@ -42,7 +42,7 @@ const CourseList = () => {
   const debouncedSearch = useCallback(
     debounce((value) => {
       setFilters((prev) => ({ ...prev, searchTerm: value }));
-    }, 800),
+    }, 700),
     []
   );
 
@@ -63,49 +63,62 @@ const CourseList = () => {
   if (loading)
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16"></div>
+        <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-300 h-16 w-16 animate-spin"></div>
       </div>
     );
 
   if (error)
     return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-        <strong className="font-bold">Error:</strong>
-        <span className="block sm:inline ml-2">{error}</span>
+      <div
+        className="bg-red-50 border border-red-400 text-red-700 px-6 py-4 rounded-lg max-w-xl mx-auto text-center font-semibold"
+        role="alert"
+      >
+        خطأ: {error}
       </div>
     );
 
   return (
-    <div className="course-list">
-      <div className="filters mb-4 flex gap-4 items-center flex-wrap">
+    <div className="course-list max-w-7xl mx-auto px-4 py-8">
+      {/* حاوية البحث مع الزر */}
+      <div className="filters mb-10 flex flex-col sm:flex-row sm:items-center justify-center gap-6">
         <input
           type="text"
-          placeholder="Search courses..."
+          placeholder="ابحث عن كورسات..."
           value={searchValue}
           onChange={handleSearch}
-          className="border border-gray-300 rounded px-4 py-2 w-72 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-300 rounded-xl px-6 py-3 w-full sm:w-96 text-lg placeholder-gray-400
+            focus:outline-none focus:ring-4 focus:ring-blue-400 focus:border-transparent
+            shadow-md hover:shadow-lg transition-shadow duration-300"
+          aria-label="بحث عن كورسات"
         />
+
         {isInstructor() && (
           <button
-            onClick={() => navigate('/courses/add')}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            onClick={() => navigate('/courses/new')}
+            className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-8 py-3 rounded-xl font-semibold
+              hover:from-indigo-700 hover:to-blue-600 transition-shadow shadow-lg whitespace-nowrap"
+            aria-label="إضافة كورس جديد"
           >
-            Add New Course
+            إضافة كورس جديد
           </button>
         )}
       </div>
 
+      {/* لا توجد كورسات */}
       {courses.length === 0 ? (
-        <div className="text-center text-gray-500 mt-12">
-          <p>No courses found.</p>
+        <div className="text-center text-gray-500 mt-24 text-xl font-light select-none">
+          لم يتم العثور على كورسات.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course) =>
-            course?.id || course?.Id ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12">
+          {courses.map((course, idx) =>
+            (course?.id || course?.Id) ? (
               <CourseCard
                 key={course.id || course.Id}
-                course={course}
+                course={{
+                  ...course,
+                  averageRating: ratings[idx % ratings.length], // ريتينج ثابت مع اسم مناسب
+                }}
                 onDelete={handleCourseDeleted}
               />
             ) : null

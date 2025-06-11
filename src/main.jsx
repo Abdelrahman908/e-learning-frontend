@@ -10,15 +10,17 @@ import { CourseProvider } from "./contexts/CourseContext";
 // استيراد ملفات CSS الخاصة بالمشروع هنا
 import './index.css';
 import './assets/styles/global.css';
+import { ChatProvider } from "./contexts/ChatContext";  // تأكد من المسار الصحيح
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <CourseProvider>
+  <BrowserRouter>
+    <AuthProvider>
+      <CourseProvider>
+        <ChatProvider>     {/* أضفت الـ ChatProvider هنا */}
           <App />
-        </CourseProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  </React.StrictMode>
+        </ChatProvider>
+      </CourseProvider>
+    </AuthProvider>
+  </BrowserRouter>
 );
+
